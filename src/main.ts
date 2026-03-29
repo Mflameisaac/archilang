@@ -83,18 +83,30 @@ function runValidate(args: string[]) {
     process.exit(0);
   }
 
-  const jsonFormat = args.includes('--format') && args[args.indexOf('--format') + 1] === 'json';
-  const filteredArgs = args.filter(a => a !== '--format' && a !== 'json' && a !== '--all');
+  // Parse flags explicitly to avoid stripping file names like "json"
+  let jsonFormat = false;
+  const hasAll = args.includes('--all');
+  const fileArgs: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--format' && args[i + 1] === 'json') {
+      jsonFormat = true;
+      i++; // skip 'json' value
+    } else if (args[i] === '--all' || args[i] === '--help' || args[i] === '-h') {
+      // skip flags
+    } else {
+      fileArgs.push(args[i]);
+    }
+  }
 
-  if (filteredArgs.length === 0 && !args.includes('--all')) {
+  if (fileArgs.length === 0 && !hasAll) {
     console.error('Usage: main.js validate <file.yaml> [file2.yaml ...] [--format json]');
     console.error('       main.js validate --all [--format json]');
     process.exit(1);
   }
 
-  const files = args.includes('--all')
+  const files = hasAll
     ? findSampleFiles()
-    : filteredArgs.map(f => resolve(f));
+    : fileArgs.map(f => resolve(f));
 
   let hasError = false;
   const jsonResults: Array<{ file: string; validation: ReturnType<typeof toValidationJson> }> = [];

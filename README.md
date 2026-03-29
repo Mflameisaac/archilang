@@ -84,6 +84,108 @@ npm run validate -- --all
 
 `OPENING_OVERLAP` は同一壁面上の開口部を壁軸方向の1D区間に射影し、sweep lineで重複を検出する。`GRID_MISALIGNMENT` は明示壁の座標がモジュールの整数倍かを検証する。`grid+offset` 形式（`dx`/`dy` 非ゼロ）で指定された壁は意図的な逸脱とみなし警告をスキップする。
 
+## JSON バリデーション出力
+
+`--format json` オプションで、バリデーション結果を構造化JSONで出力できる。各issueに `fix_hint`（修正指示）と `auto_fixable`（自動修正可能か）が付与される。
+
+```bash
+node dist/main.js validate samples/custom-walls-invalid.yaml --format json
+```
+
+出力例:
+
+```json
+{
+  "file": "samples/custom-walls-invalid.yaml",
+  "ok": false,
+  "errorCount": 3,
+  "warningCount": 1,
+  "issues": [
+    {
+      "severity": "warning",
+      "code": "GRID_MISALIGNMENT",
+      "message": "Wall \"w_custom_ext\" is not aligned to 910mm grid...",
+      "wallId": "w_custom_ext",
+      "fix_hint": "Snap wall \"w_custom_ext\" endpoints to nearest 910mm grid (0→0, 2500→2730, 1820→1820, 2500→2730)",
+      "auto_fixable": true
+    }
+  ]
+}
+```
+
+## inspect コマンド
+
+間取りデータの構造を JSON で出力する。部屋グラフ、隣接関係、占有グリッド、面積、壁一覧を含む。
+
+```bash
+# JSON出力
+node dist/main.js inspect samples/basic-3room.yaml
+
+# ASCIIマップ表示
+node dist/main.js inspect samples/basic-3room.yaml --ascii-map
+```
+
+ASCIIマップ出力例:
+
+```
+     0   1   2   3   4   5   6   7
+  +-------------------+-------------------+
+6 |bedr bedr bedr bedr|ldk  ldk  ldk  ldk |
+  +                   +                   +
+5 |bedr bedr bedr bedr|ldk  ldk  ldk  ldk |
+  +-------------------+                   +
+4 |bath bath bath bath|ldk  ldk  ldk  ldk |
+  +                   +                   +
+3 |bath bath bath bath|ldk  ldk  ldk  ldk |
+  +-------------------+-------------------+
+```
+
+JSON出力に含まれるフィールド:
+
+| フィールド | 内容 |
+|-----------|------|
+| `grid` | モジュールサイズ、グリッド総数、スパン |
+| `rooms` | 部屋一覧（面積、畳数、隣接部屋、壁リスト） |
+| `adjacency` | ドア接続による隣接グラフ |
+| `occupancyGrid` | グリッド座標ごとの部屋ID |
+| `walls` | 壁一覧（rooms、isExternal、source） |
+| `openings` | 開口部一覧（connectedRooms、wallId） |
+
+## solve コマンド
+
+バリデーションエラーの自動修正を試みる。`validate → auto-fix → revalidate` のループを実行する。
+
+```bash
+# ドライラン（修正内容を表示するが適用しない）
+node dist/main.js solve samples/custom-walls-invalid.yaml --dry-run
+
+# 修正を適用して出力
+node dist/main.js solve samples/custom-walls-invalid.yaml --out fixed.yaml
+
+# 最大反復回数を指定
+node dist/main.js solve plan.yaml --max-iter 3 --out fixed.yaml
+```
+
+出力例:
+
+```
+Iteration 1: Snapped wall "w_custom_ext" to grid: 2500→2730, 2500→2730
+Iteration 2: no auto-fixable issues remaining
+
+Solve complete: 2 iteration(s), 1 fix(es) applied
+Final: 3 error(s), 0 warning(s), ok=false
+Fixed YAML written to: fixed.yaml
+```
+
+### 自動修正ルール (v1)
+
+| エラーコード | 修正内容 | 条件 |
+|-------------|---------|------|
+| `GRID_MISALIGNMENT` | 明示壁の座標を最寄りグリッドにスナップ | `hasOffset=false`、スナップ距離がモジュール/2以内 |
+| `ROOM_WITHOUT_DOOR` | 隣接部屋との共有壁にドアを自動追加 | 共有壁あり、既存開口部なし |
+
+自動修正不可能なエラー（`UNREACHABLE_ROOM`, `ISOLATED_SUBAREA` 等）は手動修正が必要。`validate --format json` の `fix_hint` フィールドが修正の手がかりになる。
+
 ## 面積表
 
 面積表は2つの出力方式がある:
@@ -459,6 +561,11 @@ archilang/
 │   ├── svg-utils.ts         # 座標変換 (mmToSvg)、エスケープ
 │   ├── area-table.ts        # 面積計算・JSON出力
 │   ├── validator.ts          # 接続性・サブルームドア・孤立サブエリア・設備検証
+│   ├── fix-hints.ts         # バリデーションJSON出力・修正ヒント生成
+│   ├── inspect.ts           # inspect コマンド（部屋グラフ・占有グリッド・隣接関係）
+│   ├── ascii-map.ts         # ASCIIマップレンダリング
+│   ├── auto-fix.ts          # ルールベース自動修正（GRID_MISALIGNMENT, ROOM_WITHOUT_DOOR）
+│   ├── solve.ts             # solve コマンド（自動修正ループオーケストレータ）
 │   ├── types.ts             # 全型定義
 │   ├── equipment-presets.ts  # 設備プリセット定義（6種）
 │   ├── __tests__/                 # vitest テスト

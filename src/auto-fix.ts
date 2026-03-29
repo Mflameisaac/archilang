@@ -138,23 +138,26 @@ export function fixRoomWithoutDoor(
       size: { w: 800, h: 2000 }`;
 
   // Find the openings section and append
-  const openingsIdx = yamlText.indexOf('openings:');
+  let workingYaml = yamlText;
+  // Normalize flow-style empty openings: "openings: []" → "openings:"
+  workingYaml = workingYaml.replace(/openings:\s*\[\s*\]/, 'openings:');
+
+  const openingsIdx = workingYaml.indexOf('openings:');
   if (openingsIdx === -1) {
     return { yamlText, fix: { applied: false, description: 'No openings section found in YAML', code: issue.code } };
   }
 
   // Find the end of the openings list (next top-level key or end of geometry block)
-  // Simple approach: insert after the last opening entry
-  const afterOpenings = yamlText.slice(openingsIdx);
+  const afterOpenings = workingYaml.slice(openingsIdx);
   const nextSectionMatch = afterOpenings.match(/\n\s{0,2}\w+:/);
   let insertIdx: number;
   if (nextSectionMatch && nextSectionMatch.index !== undefined) {
     insertIdx = openingsIdx + nextSectionMatch.index;
   } else {
-    insertIdx = yamlText.length;
+    insertIdx = workingYaml.length;
   }
 
-  const modified = yamlText.slice(0, insertIdx) + doorYaml + '\n' + yamlText.slice(insertIdx);
+  const modified = workingYaml.slice(0, insertIdx) + doorYaml + '\n' + workingYaml.slice(insertIdx);
 
   return {
     yamlText: modified,

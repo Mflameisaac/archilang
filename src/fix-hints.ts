@@ -30,7 +30,7 @@ export function getFixHint(issue: ValidationIssue, model: BuildingModel): FixHin
       const parentId = sr?.parentRoomId ?? 'parent';
       return {
         hint: `Add a door connecting sub-room "${subRoomId}" to adjacent sub-room or parent room "${parentId}"`,
-        autoFixable: true,
+        autoFixable: false,
       };
     }
 

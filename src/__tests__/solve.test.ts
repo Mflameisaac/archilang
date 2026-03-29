@@ -112,8 +112,12 @@ describe('runSolveLoop', () => {
   it('fixes GRID_MISALIGNMENT in solve loop', () => {
     const result = runSolveLoop(GRID_MISALIGN_YAML, { maxIterations: 3, dryRun: false });
     expect(result.fixes.some(f => f.applied && f.code === 'GRID_MISALIGNMENT')).toBe(true);
-    // After fix, the GRID_MISALIGNMENT should be gone
     expect(result.finalYaml).toContain('2730');
+    // Verify fixed YAML is valid and GRID_MISALIGNMENT is resolved
+    const spec = parseArchilang(result.finalYaml);
+    const model = resolve(spec);
+    const validation = validateBuilding(model);
+    expect(validation.issues.filter(i => i.code === 'GRID_MISALIGNMENT')).toHaveLength(0);
   });
 
   it('dry-run does not modify YAML', () => {
@@ -125,5 +129,12 @@ describe('runSolveLoop', () => {
     const result = runSolveLoop(NO_DOOR_YAML, { maxIterations: 3, dryRun: false });
     expect(result.fixes.some(f => f.applied && f.code === 'ROOM_WITHOUT_DOOR')).toBe(true);
     expect(result.finalYaml).toContain('D_auto_');
+    // Verify fixed YAML is parseable and ROOM_WITHOUT_DOOR count decreased
+    const spec = parseArchilang(result.finalYaml);
+    const model = resolve(spec);
+    const validation = validateBuilding(model);
+    const noDoorIssues = validation.issues.filter(i => i.code === 'ROOM_WITHOUT_DOOR');
+    // At least one room should now have a door
+    expect(noDoorIssues.length).toBeLessThan(2); // was 2 rooms without doors
   });
 });
