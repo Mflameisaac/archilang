@@ -1,0 +1,110 @@
+# コンパクト 2DK — 小規模住戸サンプル
+# DK + 和室 + 洋室の3部屋構成
+# 西向き玄関
+
+archilang: "0.2"
+
+site:
+  orientation: west
+
+building:
+  structure: 木造軸組
+  module: shaku
+  stories: 1
+  defaults:
+    ceiling_height: 2400mm
+    external_wall:
+      thickness: 130mm
+    internal_wall:
+      partition: 90mm
+
+rendering:
+  grid_lines:
+    enabled: true
+
+geometry:
+  grids:
+    module: 910mm
+    1F:
+      x_spans: [3, 3]
+      y_spans: [3, 4]
+
+  rooms:
+    - id: dk
+      floor: 1F
+      type: DK
+      grid_rect: { x: 0, y: 0, w: 6, h: 3 }
+
+    - id: washitsu
+      floor: 1F
+      type: 和室
+      grid_rect: { x: 0, y: 3, w: 3, h: 4 }
+
+    - id: youshitsu
+      floor: 1F
+      type: 洋室
+      grid_rect: { x: 3, y: 3, w: 3, h: 4 }
+
+  openings:
+    # DK 南面 — 窓
+    - id: W1
+      type: AW
+      style: 引違い窓
+      room: dk
+      wall: south
+      position: center
+      size: { w: 2530, h: 1100 }
+      sill: 800
+
+    # 和室 西面 — 窓
+    - id: W2
+      type: AW
+      style: 引違い窓
+      room: washitsu
+      wall: west
+      position: center
+      size: { w: 1690, h: 1100 }
+      sill: 800
+
+    # 洋室 東面 — 窓
+    - id: W3
+      type: AW
+      style: 引違い窓
+      room: youshitsu
+      wall: east
+      position: center
+      size: { w: 1690, h: 1100 }
+      sill: 800
+
+    # 和室 北面 — 窓
+    - id: W4
+      type: AW
+      style: 引違い窓
+      room: washitsu
+      wall: north
+      position: center
+      size: { w: 1690, h: 1100 }
+      sill: 800
+
+    # 和室 ↔ DK
+    - id: D1
+      type: WD
+      style: 片開き
+      connects: [washitsu, dk]
+      size: { w: 800, h: 2000 }
+
+    # 洋室 ↔ DK
+    - id: D2
+      type: WD
+      style: 片開き
+      connects: [youshitsu, dk]
+      size: { w: 800, h: 2000 }
+
+    # 玄関（西側）
+    - id: ED1
+      type: AD
+      style: 片開き
+      room: dk
+      wall: west
+      position: { offset: 500 }
+      size: { w: 900, h: 2300 }

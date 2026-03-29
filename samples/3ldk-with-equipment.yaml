@@ -1,0 +1,234 @@
+# 3LDK 戸建住宅 + 設備配置サンプル
+# 3ldk-house.yaml をベースに水回り設備を追加
+# キッチン・ユニットバス・トイレ・洗面台・洗濯機・冷蔵庫
+
+archilang: "0.2"
+
+site:
+  orientation: east
+
+building:
+  structure: 木造軸組
+  module: shaku
+  stories: 1
+  defaults:
+    ceiling_height: 2400mm
+    external_wall:
+      thickness: 130mm
+    internal_wall:
+      partition: 90mm
+
+rendering:
+  grid_lines:
+    enabled: true
+
+geometry:
+  grids:
+    module: 910mm
+    1F:
+      x_spans: [3, 3, 4]
+      y_spans: [4, 4]
+
+  rooms:
+    - id: ldk
+      floor: 1F
+      type: LDK
+      grid_rect: { x: 3, y: 0, w: 7, h: 4 }
+      sub_rooms:
+        - id: kitchen
+          type: キッチン
+          seed: { x: 4, y: 1 }      # 南西エリア（カウンター・冷蔵庫周辺）
+        - id: ld
+          type: リビング・ダイニング
+          seed: { x: 8.5, y: 3 }    # 北東エリア（玄関・リビング側）
+
+    - id: washitsu
+      floor: 1F
+      type: 和室
+      grid_rect: { x: 0, y: 0, w: 3, h: 4 }
+
+    - id: bedroom
+      floor: 1F
+      type: 主寝室
+      grid_rect: { x: 0, y: 4, w: 3, h: 4 }
+
+    - id: kodomo
+      floor: 1F
+      type: 子供部屋
+      grid_rect: { x: 3, y: 4, w: 3, h: 4 }
+
+    - id: bath
+      floor: 1F
+      type: 浴室
+      grid_rect: { x: 6, y: 6, w: 4, h: 2 }
+
+    - id: wash
+      floor: 1F
+      type: 洗面脱衣
+      grid_rect: { x: 8, y: 4, w: 2, h: 2 }
+
+    - id: toilet
+      floor: 1F
+      type: トイレ
+      grid_rect: { x: 6, y: 4, w: 2, h: 2 }
+
+  # --- 明示的壁 ---
+  walls:
+    mode: additive
+    segments:
+      # LDK内カウンター壁（部分壁 — 南側のみ、北側開放）
+      # x=7 で南壁(y=0)から y=2 まで。キッチンとLD を分離
+      - id: w_counter
+        floor: 1F
+        from: { grid: { x: 7, y: 0 } }
+        to: { grid: { x: 7, y: 2 } }
+        thickness: 90mm
+        type: internal
+
+  openings:
+    # LDK 南面 — 掃き出し窓
+    - id: W1
+      type: AW
+      style: 引違い窓
+      room: ldk
+      wall: south
+      position: center
+      size: { w: 2530, h: 2000 }
+      sill: 0
+
+    # LDK 東面 — 腰窓（ED1=500-1400mmの北側に配置）
+    - id: W2
+      type: AW
+      style: 引違い窓
+      room: ldk
+      wall: east
+      position: { offset: 1600 }
+      size: { w: 1690, h: 1100 }
+      sill: 800
+
+    # 和室 南面
+    - id: W3
+      type: AW
+      style: 引違い窓
+      room: washitsu
+      wall: south
+      position: center
+      size: { w: 1690, h: 1100 }
+      sill: 800
+
+    # 主寝室 西面
+    - id: W4
+      type: AW
+      style: 引違い窓
+      room: bedroom
+      wall: west
+      position: center
+      size: { w: 1690, h: 1100 }
+      sill: 800
+
+    # 子供部屋 北面
+    - id: W5
+      type: AW
+      style: 引違い窓
+      room: kodomo
+      wall: north
+      position: center
+      size: { w: 1690, h: 1100 }
+      sill: 800
+
+    # 和室 ↔ LDK
+    - id: D1
+      type: WD
+      style: 片開き
+      connects: [washitsu, ldk]
+      size: { w: 800, h: 2000 }
+
+    # 主寝室 ↔ 子供部屋
+    - id: D2
+      type: WD
+      style: 片開き
+      connects: [bedroom, kodomo]
+      size: { w: 800, h: 2000 }
+
+    # 子供部屋 ↔ LDK（キッチン北壁の西端寄せ、カウンタースペース確保）
+    - id: D3
+      type: WD
+      style: 片開き
+      connects: [kodomo, ldk]
+      size: { w: 800, h: 2000 }
+
+    # 洗面脱衣 ↔ LDK（引き戸：狭小水回りに適した開閉方式）
+    - id: D4
+      type: WD
+      style: 引き戸
+      connects: [wash, ldk]
+      size: { w: 800, h: 2000 }
+
+    # トイレ ↔ 洗面脱衣（引き戸）
+    - id: D5
+      type: WD
+      style: 引き戸
+      connects: [toilet, wash]
+      size: { w: 800, h: 2000 }
+
+    # 浴室 ↔ 洗面脱衣（引き戸）
+    - id: D6
+      type: WD
+      style: 引き戸
+      connects: [bath, wash]
+      size: { w: 800, h: 2000 }
+
+    # 玄関（東側）
+    - id: ED1
+      type: AD
+      style: 片開き
+      room: ldk
+      wall: east
+      position: { offset: 500 }
+      size: { w: 900, h: 2300 }
+
+  equipment:
+    # LDK — キッチンカウンター（南壁西端、W1の西隣）
+    # W1=offset 1920-4450mm、K1: offset 0 → 0-1800mm（120mm余裕）
+    - id: K1
+      type: kitchen_counter
+      room: ldk
+      wall: south
+      position: { offset: 0 }
+      size: { w: 1800, h: 650 }
+
+    # LDK — 冷蔵庫（西壁、カウンター北側でL字配置）
+    # K1 depth=650mm、REF1: offset 700 → y:700-1385mm（D1=1420mmと35mm余裕）
+    - id: REF1
+      type: refrigerator
+      room: ldk
+      wall: west
+      position: { offset: 700 }
+
+    # 浴室 — ユニットバス（北壁西寄せ、D6クリアランス回避）
+    - id: UB1
+      type: unit_bath
+      room: bath
+      wall: north
+      position: { offset: 0 }
+
+    # 洗面脱衣 — 洗面台（東壁南寄り）
+    - id: WB1
+      type: washbasin
+      room: wash
+      wall: east
+      position: { offset: 200 }
+
+    # 洗面脱衣 — 洗濯機（東壁北寄り）
+    - id: WM1
+      type: washing_machine
+      room: wash
+      wall: east
+      position: { offset: 1050 }
+
+    # トイレ — 便器（北壁西寄せ、D5クリアランス回避）
+    - id: T1
+      type: toilet
+      room: toilet
+      wall: north
+      position: { offset: 200 }

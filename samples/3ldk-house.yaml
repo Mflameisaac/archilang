@@ -1,0 +1,144 @@
+# 3LDK 戸建住宅 — 多部屋サンプル
+# LDK + 和室 + 寝室 + 子供部屋 + 浴室・洗面の5ゾーン
+# 東向き玄関
+
+archilang: "0.2"
+
+site:
+  orientation: east
+
+building:
+  structure: 木造軸組
+  module: shaku
+  stories: 1
+  defaults:
+    ceiling_height: 2400mm
+    external_wall:
+      thickness: 130mm
+    internal_wall:
+      partition: 90mm
+
+rendering:
+  grid_lines:
+    enabled: true
+
+geometry:
+  grids:
+    module: 910mm
+    1F:
+      x_spans: [3, 3, 4]
+      y_spans: [4, 4]
+
+  rooms:
+    - id: ldk
+      floor: 1F
+      type: LDK
+      grid_rect: { x: 3, y: 0, w: 7, h: 4 }
+
+    - id: washitsu
+      floor: 1F
+      type: 和室
+      grid_rect: { x: 0, y: 0, w: 3, h: 4 }
+
+    - id: bedroom
+      floor: 1F
+      type: 主寝室
+      grid_rect: { x: 0, y: 4, w: 3, h: 4 }
+
+    - id: kodomo
+      floor: 1F
+      type: 子供部屋
+      grid_rect: { x: 3, y: 4, w: 3, h: 4 }
+
+    - id: bath
+      floor: 1F
+      type: 浴室・洗面
+      grid_rect: { x: 6, y: 4, w: 4, h: 4 }
+
+  openings:
+    # LDK 南面 — 掃き出し窓
+    - id: W1
+      type: AW
+      style: 引違い窓
+      room: ldk
+      wall: south
+      position: center
+      size: { w: 2530, h: 2000 }
+      sill: 0
+
+    # LDK 東面 — 腰窓
+    - id: W2
+      type: AW
+      style: 引違い窓
+      room: ldk
+      wall: east
+      position: center
+      size: { w: 1690, h: 1100 }
+      sill: 800
+
+    # 和室 南面
+    - id: W3
+      type: AW
+      style: 引違い窓
+      room: washitsu
+      wall: south
+      position: center
+      size: { w: 1690, h: 1100 }
+      sill: 800
+
+    # 主寝室 西面
+    - id: W4
+      type: AW
+      style: 引違い窓
+      room: bedroom
+      wall: west
+      position: center
+      size: { w: 1690, h: 1100 }
+      sill: 800
+
+    # 子供部屋 北面
+    - id: W5
+      type: AW
+      style: 引違い窓
+      room: kodomo
+      wall: north
+      position: center
+      size: { w: 1690, h: 1100 }
+      sill: 800
+
+    # 和室 ↔ LDK
+    - id: D1
+      type: WD
+      style: 片開き
+      connects: [washitsu, ldk]
+      size: { w: 800, h: 2000 }
+
+    # 主寝室 ↔ 子供部屋 (※ 共有壁でドア)
+    - id: D2
+      type: WD
+      style: 片開き
+      connects: [bedroom, kodomo]
+      size: { w: 800, h: 2000 }
+
+    # 子供部屋 ↔ LDK
+    - id: D3
+      type: WD
+      style: 片開き
+      connects: [kodomo, ldk]
+      size: { w: 800, h: 2000 }
+
+    # 浴室 ↔ LDK
+    - id: D4
+      type: WD
+      style: 片開き
+      connects: [bath, ldk]
+      size: { w: 800, h: 2000 }
+
+    # 玄関（東側）
+    - id: ED1
+      type: AD
+      style: 片開き
+      room: ldk
+      wall: east
+      position: { offset: 500 }
+      size: { w: 900, h: 2300 }

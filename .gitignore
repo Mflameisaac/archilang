@@ -1,0 +1,8 @@
+node_modules/
+dist/
+output*.svg
+output*.html
+output*.area.json
+samples/*.svg
+samples/*.html
+samples/*.area.json

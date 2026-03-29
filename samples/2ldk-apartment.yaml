@@ -1,0 +1,99 @@
+# 2LDK マンション — 中規模サンプル
+# LDK + 洋室2部屋 + 廊下の4ゾーン構成
+
+archilang: "0.2"
+
+site:
+  orientation: south
+
+building:
+  structure: 木造軸組
+  module: shaku
+  stories: 1
+  defaults:
+    ceiling_height: 2400mm
+    external_wall:
+      thickness: 130mm
+    internal_wall:
+      partition: 90mm
+
+rendering:
+  grid_lines:
+    enabled: true
+
+geometry:
+  grids:
+    module: 910mm
+    1F:
+      x_spans: [4, 4]
+      y_spans: [3, 4]
+
+  rooms:
+    - id: ldk
+      floor: 1F
+      type: LDK
+      grid_rect: { x: 0, y: 0, w: 8, h: 3 }
+
+    - id: room1
+      floor: 1F
+      type: 洋室1
+      grid_rect: { x: 0, y: 3, w: 4, h: 4 }
+
+    - id: room2
+      floor: 1F
+      type: 洋室2
+      grid_rect: { x: 4, y: 3, w: 4, h: 4 }
+
+  openings:
+    # LDK 南面 — 大きな掃き出し窓
+    - id: W1
+      type: AW
+      style: 引違い窓
+      room: ldk
+      wall: south
+      position: center
+      size: { w: 3640, h: 2000 }
+      sill: 0
+
+    # 洋室1 — 西側の窓
+    - id: W2
+      type: AW
+      style: 引違い窓
+      room: room1
+      wall: west
+      position: center
+      size: { w: 1690, h: 1100 }
+      sill: 800
+
+    # 洋室2 — 東側の窓
+    - id: W3
+      type: AW
+      style: 引違い窓
+      room: room2
+      wall: east
+      position: center
+      size: { w: 1690, h: 1100 }
+      sill: 800
+
+    # 洋室1 ↔ LDK
+    - id: D1
+      type: WD
+      style: 片開き
+      connects: [room1, ldk]
+      size: { w: 800, h: 2000 }
+
+    # 洋室2 ↔ LDK
+    - id: D2
+      type: WD
+      style: 片開き
+      connects: [room2, ldk]
+      size: { w: 800, h: 2000 }
+
+    # 玄関ドア
+    - id: ED1
+      type: AD
+      style: 片開き
+      room: ldk
+      wall: south
+      position: { offset: 600 }
+      size: { w: 900, h: 2300 }

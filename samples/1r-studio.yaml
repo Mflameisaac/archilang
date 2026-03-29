@@ -1,0 +1,53 @@
+# 1R ワンルーム — 最小構成サンプル
+# 部屋1つ + 窓1つ + 玄関ドア1つ
+
+archilang: "0.2"
+
+site:
+  orientation: south
+
+building:
+  structure: 木造軸組
+  module: shaku
+  stories: 1
+  defaults:
+    ceiling_height: 2400mm
+    external_wall:
+      thickness: 130mm
+    internal_wall:
+      partition: 90mm
+
+rendering:
+  grid_lines:
+    enabled: true
+
+geometry:
+  grids:
+    module: 910mm
+    1F:
+      x_spans: [4]
+      y_spans: [5]
+
+  rooms:
+    - id: room
+      floor: 1F
+      type: 居室
+      grid_rect: { x: 0, y: 0, w: 4, h: 5 }
+
+  openings:
+    - id: W1
+      type: AW
+      style: 引違い窓
+      room: room
+      wall: south
+      position: center
+      size: { w: 1690, h: 1100 }
+      sill: 800
+
+    - id: ED1
+      type: AD
+      style: 片開き
+      room: room
+      wall: north
+      position: { offset: 500 }
+      size: { w: 800, h: 2000 }

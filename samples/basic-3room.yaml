@@ -1,0 +1,90 @@
+archilang: "0.2"
+
+site:
+  orientation: south
+
+building:
+  structure: 木造軸組
+  module: shaku   # 910mm
+  stories: 1
+  defaults:
+    ceiling_height: 2400mm
+    external_wall:
+      thickness: 130mm
+    internal_wall:
+      partition: 90mm
+
+rendering:
+  grid_lines:
+    enabled: true
+
+geometry:
+  grids:
+    module: 910mm
+    1F:
+      x_spans: [3, 5]
+      y_spans: [3, 4]
+
+  rooms:
+    - id: ldk
+      floor: 1F
+      type: LDK
+      grid_rect: { x: 3, y: 0, w: 5, h: 7 }
+
+    - id: bedroom
+      floor: 1F
+      type: 寝室
+      grid_rect: { x: 0, y: 3, w: 3, h: 4 }
+
+    - id: bath_area
+      floor: 1F
+      type: 浴室・洗面
+      grid_rect: { x: 0, y: 0, w: 3, h: 3 }
+
+  openings:
+    - id: W1
+      type: AW
+      style: 引違い窓
+      room: ldk
+      wall: south
+      position: center
+      size: { w: 2530, h: 2000 }
+      sill: 0
+
+    - id: W2
+      type: AW
+      style: 引違い窓
+      room: bedroom
+      wall: west
+      position: center
+      size: { w: 1690, h: 1100 }
+      sill: 800
+
+    - id: W3
+      type: AW
+      style: 引違い窓
+      room: ldk
+      wall: east
+      position: center
+      size: { w: 1690, h: 1100 }
+      sill: 800
+
+    - id: D1
+      type: WD
+      style: 片開き
+      connects: [bedroom, ldk]
+      size: { w: 800, h: 2000 }
+
+    - id: D2
+      type: WD
+      style: 片開き
+      connects: [bath_area, ldk]
+      size: { w: 800, h: 2000 }
+
+    - id: ED1
+      type: AD
+      style: 片開き
+      room: ldk
+      wall: south
+      position: { offset: 500 }
+      size: { w: 900, h: 2300 }

@@ -1,0 +1,92 @@
+archilang: "0.2"
+
+site:
+  orientation: south
+
+building:
+  structure: 木造軸組
+  module: shaku   # 910mm
+  stories: 1
+  defaults:
+    ceiling_height: 2400mm
+    external_wall:
+      thickness: 130mm
+    internal_wall:
+      partition: 90mm
+
+rendering:
+  grid_lines:
+    enabled: true
+
+geometry:
+  grids:
+    module: 910mm
+    1F:
+      x_spans: [4, 4]
+      y_spans: [7]
+
+  rooms:
+    - id: living
+      floor: 1F
+      type: リビング
+      grid_rect: { x: 0, y: 0, w: 4, h: 7 }
+
+    - id: dining
+      floor: 1F
+      type: ダイニング
+      grid_rect: { x: 4, y: 0, w: 4, h: 7 }
+
+  openings:
+    - id: W1
+      type: AW
+      style: 引違い窓
+      room: living
+      wall: south
+      position: center
+      size: { w: 2530, h: 2000 }
+      sill: 0
+
+    - id: W2
+      type: AW
+      style: 引違い窓
+      room: dining
+      wall: east
+      position: center
+      size: { w: 1690, h: 1100 }
+      sill: 800
+
+    - id: D1
+      type: WD
+      style: 片開き
+      connects: [living, dining]
+      size: { w: 800, h: 2000 }
+
+  walls:
+    mode: additive
+    segments:
+      # Explicit wall with mm coordinates — a partition inside the living room
+      - id: w_partition
+        floor: 1F
+        from: { x: 1820, y: 0 }
+        to: { x: 1820, y: 3640 }
+        thickness: 90mm
+        type: internal
+        grid_line: true
+
+      # Wall using grid + offset — offset 150mm from grid line X2
+      - id: w_offset_wall
+        floor: 1F
+        from: { grid: { x: 4, y: 4 }, dx: 1500, dy: 0 }
+        to: { grid: { x: 4, y: 7 }, dx: 1500, dy: 0 }
+        thickness: 90mm
+        type: internal
+        grid_line: true
+
+      # External wall at a custom position (not on grid)
+      - id: w_custom_ext
+        floor: 1F
+        from: { x: 0, y: 2500 }
+        to: { x: 1820, y: 2500 }
+        thickness: 130mm
+        type: external
+        grid_line: true

@@ -1,0 +1,142 @@
+# L字型LDK + 矩形部屋の組み合わせ — grid_rects (multi-rect) サンプル
+# 南向き / LDKがL字型 / 他は通常矩形
+#
+# 平面構成（y=0が南, 8×7グリッド）:
+#   上段(y=3-7) : 寝室(3×4)    | LDK北部(5×4)
+#   下段(y=0-3) :              | LDK南部(5×3) | 玄関(3×3)...ではなく
+#
+#   実際のレイアウト:
+#   y=3-7: 寝室(0,3)-(3,7)  | LDK北(3,3)-(8,7)
+#   y=0-3: 空き              | LDK南(3,0)-(8,3)...ではなく玄関を配置
+#
+#   修正版:
+#   y=4-7: 寝室(0,4)-(3,7)  | LDK北(3,4)-(7,7)
+#   y=0-4: LDK南(0,0)-(7,4)
+#   y=0-4: 玄関(7,0)-(9,4)
+#
+# LDKはL字型:
+#   rect1: (0, 0, 7, 4) — 南側の横長部分
+#   rect2: (3, 4, 4, 3) — 北東に突き出す部分
+
+archilang: "0.2"
+
+rendering:
+  grid_lines:
+    enabled: true
+  area_table:
+    enabled: true
+
+site:
+  orientation: south
+
+building:
+  structure: 木造軸組
+  module: shaku
+  stories: 1
+  defaults:
+    ceiling_height: 2400mm
+    external_wall:
+      thickness: 130mm
+    internal_wall:
+      partition: 90mm
+
+geometry:
+  grids:
+    module: 910mm
+    1F:
+      x_spans: [3, 4, 2]   # grid X: 0, 3, 7, 9
+      y_spans: [4, 3]       # grid Y: 0, 4, 7
+
+  rooms:
+    # L字型LDK（grid_rectsで2矩形合成 + sub_roomsでキッチン/リビング分割）
+    - id: ldk
+      floor: 1F
+      type: LDK
+      grid_rects:
+        - { x: 0, y: 0, w: 7, h: 4 }   # 南側の横長部分
+        - { x: 3, y: 4, w: 4, h: 3 }    # 北東に突き出す部分
+      sub_rooms:
+        - id: living
+          type: リビング
+          seed: { x: 1.5, y: 2 }          # カウンター西側
+        - id: kitchen
+          type: キッチン
+          seed: { x: 5, y: 5 }            # カウンター東側（北東突出部含む）
+
+    # 寝室（通常矩形）
+    - id: bedroom
+      floor: 1F
+      type: 寝室
+      grid_rect: { x: 0, y: 4, w: 3, h: 3 }
+
+    # 玄関（通常矩形）
+    - id: entrance
+      floor: 1F
+      type: 玄関
+      grid_rect: { x: 7, y: 0, w: 2, h: 4 }
+
+  # --- 明示的壁 ---
+  walls:
+    mode: additive
+    segments:
+      # LDK内キッチンカウンター（部分壁 — 南側のみ、上部開放）
+      - id: w_counter
+        floor: 1F
+        from: { grid: { x: 3, y: 0 } }
+        to: { grid: { x: 3, y: 2 } }
+        thickness: 90mm
+        type: internal
+
+  openings:
+    # LDK南側窓
+    - id: W1
+      type: AW
+      style: 引違い窓
+      room: ldk
+      wall: south
+      position: center
+      size: { w: 3640, h: 2000 }
+      sill: 0
+
+    # 寝室北窓
+    - id: W2
+      type: AW
+      style: 引違い窓
+      room: bedroom
+      wall: north
+      position: center
+      size: { w: 1690, h: 1100 }
+      sill: 800
+
+    # LDK北窓
+    - id: W3
+      type: AW
+      style: 引違い窓
+      room: ldk
+      wall: north
+      position: center
+      size: { w: 2530, h: 1100 }
+      sill: 800
+
+    # 玄関ドア（外部）
+    - id: ED1
+      type: AD
+      style: 片開き
+      room: entrance
+      wall: east
+      position: { offset: 1000 }
+      size: { w: 900, h: 2300 }
+
+    # LDK↔寝室ドア
+    - id: D1
+      type: WD
+      style: 片開き
+      connects: [ldk, bedroom]
+      size: { w: 800, h: 2000 }
+
+    # LDK↔玄関ドア
+    - id: D2
+      type: WD
+      style: 片開き
+      connects: [ldk, entrance]
+      size: { w: 800, h: 2000 }
