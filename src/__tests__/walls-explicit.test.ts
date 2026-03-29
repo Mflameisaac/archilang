@@ -171,6 +171,77 @@ describe('walls.segments (mm coordinate explicit walls)', () => {
     expect(['north', 'south']).toContain(custom!.side);
   });
 
+  it('assigns rooms to explicit wall on shared boundary between two rooms', () => {
+    // Vertical wall at x=2730 (boundary between bath_area/bedroom and ldk)
+    const model = resolve(parseArchilang(yamlWithWalls(`
+  walls:
+    segments:
+      - id: w_shared
+        floor: 1F
+        from: { x: 2730, y: 0 }
+        to: { x: 2730, y: 2730 }
+        thickness: 90mm
+        type: internal
+`)));
+    const wall = model.walls.find(w => w.id === 'w_shared')!;
+    expect(wall).toBeDefined();
+    // Wall at x=2730 between bath_area (0,0,2730,2730) and ldk (2730,0,4550,6370)
+    expect(wall.rooms).toContain('bath_area');
+    expect(wall.rooms).toContain('ldk');
+    expect(wall.rooms).toHaveLength(2);
+  });
+
+  it('assigns rooms to explicit wall on single room exterior', () => {
+    // Horizontal wall at y=0 along bath_area south edge only
+    const model = resolve(parseArchilang(yamlWithWalls(`
+  walls:
+    segments:
+      - id: w_ext
+        floor: 1F
+        from: { x: 0, y: 0 }
+        to: { x: 1000, y: 0 }
+        thickness: 130mm
+        type: external
+`)));
+    const wall = model.walls.find(w => w.id === 'w_ext')!;
+    expect(wall).toBeDefined();
+    expect(wall.rooms).toContain('bath_area');
+    expect(wall.rooms).toHaveLength(1);
+  });
+
+  it('assigns empty rooms to explicit wall outside all rooms', () => {
+    // Wall completely outside the building footprint
+    const model = resolve(parseArchilang(yamlWithWalls(`
+  walls:
+    segments:
+      - id: w_outside
+        floor: 1F
+        from: { x: 10000, y: 0 }
+        to: { x: 10000, y: 2000 }
+`)));
+    const wall = model.walls.find(w => w.id === 'w_outside')!;
+    expect(wall).toBeDefined();
+    expect(wall.rooms).toHaveLength(0);
+  });
+
+  it('does not assign room to interior partition wall (not on boundary)', () => {
+    // Vertical wall inside bath_area (x=1500 is between 0 and 2730, not on any rect edge)
+    // Interior walls are detected by findBarriersInRoom via geometric check, not via rooms[]
+    const model = resolve(parseArchilang(yamlWithWalls(`
+  walls:
+    segments:
+      - id: w_partition
+        floor: 1F
+        from: { x: 1500, y: 0 }
+        to: { x: 1500, y: 2730 }
+        thickness: 90mm
+        type: internal
+`)));
+    const wall = model.walls.find(w => w.id === 'w_partition')!;
+    expect(wall).toBeDefined();
+    expect(wall.rooms).toHaveLength(0);
+  });
+
   it('coexists with auto-extracted walls', () => {
     const modelBase = resolve(parseArchilang(BASE_YAML));
     const baseCount = modelBase.walls.length;

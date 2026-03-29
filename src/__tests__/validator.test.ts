@@ -289,3 +289,125 @@ describe('formatValidation', () => {
     expect(output).toContain('1 warning(s)');
   });
 });
+
+describe('GRID_MISALIGNMENT detection', () => {
+  const BASE = `
+archilang: "0.2"
+site:
+  orientation: south
+building:
+  structure: 木造軸組
+  module: shaku
+  stories: 1
+  defaults:
+    ceiling_height: 2400mm
+    external_wall:
+      thickness: 130mm
+    internal_wall:
+      partition: 90mm
+geometry:
+  grids:
+    module: 910mm
+    1F:
+      x_spans: [4]
+      y_spans: [4]
+  rooms:
+    - id: room1
+      floor: 1F
+      type: Room
+      grid_rect: { x: 0, y: 0, w: 4, h: 4 }
+  openings: []
+`;
+
+  it('no warning for grid-aligned explicit wall', () => {
+    const yaml = BASE + `
+  walls:
+    segments:
+      - id: w_aligned
+        floor: 1F
+        from: { grid: { x: 2, y: 0 } }
+        to: { grid: { x: 2, y: 4 } }
+        type: internal
+`;
+    const model = resolve(parseArchilang(yaml));
+    const result = validateBuilding(model);
+    const misalign = result.issues.filter(i => i.code === 'GRID_MISALIGNMENT');
+    expect(misalign).toHaveLength(0);
+  });
+
+  it('warns for mm-specified off-grid explicit wall', () => {
+    const yaml = BASE + `
+  walls:
+    segments:
+      - id: w_offgrid
+        floor: 1F
+        from: { x: 2500, y: 0 }
+        to: { x: 2500, y: 3640 }
+        type: internal
+`;
+    const model = resolve(parseArchilang(yaml));
+    const result = validateBuilding(model);
+    const misalign = result.issues.filter(i => i.code === 'GRID_MISALIGNMENT');
+    expect(misalign).toHaveLength(1);
+    expect(misalign[0].severity).toBe('warning');
+    expect(misalign[0].message).toContain('2500mm');
+  });
+
+  it('no warning for grid+offset explicit wall (intentional)', () => {
+    const yaml = BASE + `
+  walls:
+    segments:
+      - id: w_offset
+        floor: 1F
+        from: { grid: { x: 2, y: 0 }, dx: 150 }
+        to: { grid: { x: 2, y: 4 }, dx: 150 }
+        type: internal
+`;
+    const model = resolve(parseArchilang(yaml));
+    const result = validateBuilding(model);
+    const misalign = result.issues.filter(i => i.code === 'GRID_MISALIGNMENT');
+    expect(misalign).toHaveLength(0);
+  });
+
+  it('no warning for auto-extracted walls', () => {
+    // No explicit walls at all
+    const model = resolve(parseArchilang(BASE));
+    const result = validateBuilding(model);
+    const misalign = result.issues.filter(i => i.code === 'GRID_MISALIGNMENT');
+    expect(misalign).toHaveLength(0);
+  });
+
+  it('no false positive for coordinate near grid boundary (mod - epsilon)', () => {
+    // x=1820 (2*910) is on-grid; should not trigger even if near boundary
+    const yaml = BASE + `
+  walls:
+    segments:
+      - id: w_near
+        floor: 1F
+        from: { x: 1820, y: 0 }
+        to: { x: 1820, y: 3640 }
+        type: internal
+`;
+    const model = resolve(parseArchilang(yaml));
+    const result = validateBuilding(model);
+    const misalign = result.issues.filter(i => i.code === 'GRID_MISALIGNMENT');
+    expect(misalign).toHaveLength(0);
+  });
+
+  it('warns for coordinate exactly half-grid', () => {
+    // x=455 (910/2) is off-grid
+    const yaml = BASE + `
+  walls:
+    segments:
+      - id: w_half
+        floor: 1F
+        from: { x: 455, y: 0 }
+        to: { x: 455, y: 3640 }
+        type: internal
+`;
+    const model = resolve(parseArchilang(yaml));
+    const result = validateBuilding(model);
+    const misalign = result.issues.filter(i => i.code === 'GRID_MISALIGNMENT');
+    expect(misalign).toHaveLength(1);
+  });
+});

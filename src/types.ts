@@ -175,6 +175,8 @@ export interface WallEdge {
   isExternal: boolean;
   thickness: number;
   rooms: string[]; // room ids sharing this edge
+  source?: 'auto' | 'explicit';
+  hasOffset?: boolean; // true if grid+offset was used (intentional misalignment)
 }
 
 export interface ResolvedOpening {

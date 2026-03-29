@@ -20,7 +20,9 @@ export type IssueCode =
   | 'EQUIPMENT_OUT_OF_BOUNDS'
   | 'EQUIPMENT_OVERLAP'
   | 'EQUIPMENT_OPENING_WALL_OVERLAP'
-  | 'EQUIPMENT_DOOR_CLEARANCE_BLOCKED';
+  | 'EQUIPMENT_DOOR_CLEARANCE_BLOCKED'
+  | 'OPENING_OVERLAP'
+  | 'GRID_MISALIGNMENT';
 
 export interface ValidationIssue {
   severity: Severity;
@@ -163,6 +165,12 @@ export function validateBuilding(model: BuildingModel): ValidationResult {
       roomIds: s.connects ? [...s.connects] : s.room ? [s.room] : undefined,
     });
   }
+
+  // Check opening overlaps on same wall
+  detectOpeningOverlaps(model, issues);
+
+  // Check grid alignment for explicit walls
+  checkGridAlignment(model, issues);
 
   // Build room-level connectivity graph
   const wallRoomMap = new Map<string, string[]>();
@@ -340,6 +348,85 @@ export function validateBuilding(model: BuildingModel): ValidationResult {
     warningCount,
     ok: errorCount === 0,
   };
+}
+
+// ─── Grid alignment check ───
+
+function checkGridAlignment(model: BuildingModel, issues: ValidationIssue[]): void {
+  const mod = model.moduleSize;
+  for (const wall of model.walls) {
+    if (wall.source !== 'explicit') continue;
+    if (wall.hasOffset) continue;
+
+    const coords = [wall.x1, wall.y1, wall.x2, wall.y2];
+    const offGrid = coords.filter(c => {
+      const r = ((c % mod) + mod) % mod;
+      return Math.min(r, mod - r) > EPS;
+    });
+    if (offGrid.length > 0) {
+      issues.push({
+        severity: 'warning',
+        code: 'GRID_MISALIGNMENT',
+        message: `Wall "${wall.id}" is not aligned to ${mod}mm grid (off-grid coordinates: ${offGrid.map(c => `${c}mm`).join(', ')})`,
+        wallId: wall.id,
+      });
+    }
+  }
+}
+
+// ─── Opening overlap detection ───
+
+function detectOpeningOverlaps(model: BuildingModel, issues: ValidationIssue[]): void {
+  const wallMap = new Map<string, WallEdge>();
+  for (const w of model.walls) wallMap.set(w.id, w);
+
+  // Group openings by geometric wall line (orientation + position) instead of wallId,
+  // so that openings on physically overlapping walls with different IDs are compared.
+  // Use EPS-based clustering to avoid float rounding issues at integer boundaries.
+  const byGeoKey = new Map<string, ResolvedOpening[]>();
+  for (const o of model.openings) {
+    const wall = wallMap.get(o.wallId);
+    if (!wall) continue;
+    const isHoriz = Math.abs(wall.y1 - wall.y2) < EPS;
+    const pos = isHoriz ? wall.y1 : wall.x1;
+    const quantized = Math.round(pos / EPS) * EPS;
+    const geoKey = `${isHoriz ? 'H' : 'V'}:${quantized}`;
+    const list = byGeoKey.get(geoKey) ?? [];
+    list.push(o);
+    byGeoKey.set(geoKey, list);
+  }
+
+  for (const [, opens] of byGeoKey) {
+    if (opens.length < 2) continue;
+
+    const firstWall = wallMap.get(opens[0].wallId)!;
+    const isHoriz = Math.abs(firstWall.y1 - firstWall.y2) < EPS;
+
+    const intervals = opens.map(o => {
+      const center = isHoriz ? o.cx : o.cy;
+      const half = o.w / 2;
+      return { id: o.id, start: center - half, end: center + half, wallId: o.wallId };
+    }).sort((a, b) => a.start - b.start);
+
+    let maxEnd = intervals[0].end;
+    let maxId = intervals[0].id;
+    for (let i = 1; i < intervals.length; i++) {
+      if (intervals[i].start < maxEnd - EPS) {
+        const overlap = Math.round(maxEnd - intervals[i].start);
+        issues.push({
+          severity: 'warning',
+          code: 'OPENING_OVERLAP',
+          message: `Opening "${intervals[i].id}" overlaps "${maxId}" (overlap: ${overlap}mm)`,
+          openingId: intervals[i].id,
+          wallId: intervals[i].wallId,
+        });
+      }
+      if (intervals[i].end > maxEnd) {
+        maxEnd = intervals[i].end;
+        maxId = intervals[i].id;
+      }
+    }
+  }
 }
 
 export function formatValidation(result: ValidationResult): string {

@@ -47,13 +47,14 @@ describe('multi-rect rooms (grid_rects)', () => {
   it('extracts correct perimeter walls for L-shaped room', () => {
     const model = loadAndResolve('l-shaped-ldk');
 
-    // L-shaped LDK should NOT have internal walls between its own rects
-    // Verify no wall has only 'ldk' on both sides
-    const ldkOnlyWalls = model.walls.filter(
-      w => w.rooms.length === 1 && w.rooms[0] === 'ldk'
+    // L-shaped LDK should NOT have auto-extracted internal walls between its own rects
+    // Verify no auto-extracted wall has only 'ldk' on both sides and is internal
+    // (explicit partition walls like w_counter are intentionally internal within ldk)
+    const ldkOnlyAutoWalls = model.walls.filter(
+      w => w.rooms.length === 1 && w.rooms[0] === 'ldk' && w.id.startsWith('wall_')
     );
-    // All ldk-only walls should be external
-    for (const w of ldkOnlyWalls) {
+    // All auto-extracted ldk-only walls should be external
+    for (const w of ldkOnlyAutoWalls) {
       expect(w.isExternal).toBe(true);
     }
 

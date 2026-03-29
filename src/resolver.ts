@@ -62,6 +62,9 @@ export function resolve(spec: Archilang): BuildingModel {
     ? explicitWalls
     : mergeWalls(autoWalls, explicitWalls);
 
+  // Assign room ownership to explicit walls (they are created with rooms: [])
+  assignRoomsToWalls(walls, rooms);
+
   // Resolve sub_rooms (before openings so sub_room IDs are available)
   const roomSpecs = spec.geometry.rooms.filter(r => r.floor === '1F');
   const subRooms = resolveSubRooms(roomSpecs, rooms, walls, moduleSize);
@@ -437,6 +440,54 @@ function mergeWalls(autoWalls: WallEdge[], explicitWalls: WallEdge[]): WallEdge[
   return [...autoWalls, ...explicitWalls];
 }
 
+/**
+ * Assign room ownership to walls that have rooms: [].
+ * Uses extractRoomPerimeterEdges to match against the room's true outer perimeter,
+ * excluding multi-rect internal seams.
+ */
+function assignRoomsToWalls(walls: WallEdge[], rooms: ResolvedRoom[]): void {
+  const EPS = 0.5;
+
+  // Pre-compute perimeter edges for each room
+  const perimeterByRoom = rooms.map(room => ({
+    roomId: room.id,
+    edges: extractRoomPerimeterEdges(room),
+  }));
+
+  for (const wall of walls) {
+    if (wall.rooms.length > 0) continue;
+
+    const isVertical = Math.abs(wall.x1 - wall.x2) < EPS;
+    const isHorizontal = Math.abs(wall.y1 - wall.y2) < EPS;
+    if (!isVertical && !isHorizontal) continue;
+
+    const ownerRoomIds = new Set<string>();
+
+    for (const { roomId, edges } of perimeterByRoom) {
+      for (const edge of edges) {
+        // Match orientation
+        if (isVertical && edge.orientation !== 'vertical') continue;
+        if (isHorizontal && edge.orientation !== 'horizontal') continue;
+
+        // Match position (wall pos must equal edge pos)
+        const wallPos = isVertical ? wall.x1 : wall.y1;
+        if (Math.abs(wallPos - edge.pos) > EPS) continue;
+
+        // Check range overlap
+        const wallStart = isVertical ? Math.min(wall.y1, wall.y2) : Math.min(wall.x1, wall.x2);
+        const wallEnd = isVertical ? Math.max(wall.y1, wall.y2) : Math.max(wall.x1, wall.x2);
+        const overlapLen = Math.min(wallEnd, edge.end) - Math.max(wallStart, edge.start);
+        if (overlapLen > EPS) {
+          ownerRoomIds.add(roomId);
+          break; // No need to check more edges for this room
+        }
+      }
+    }
+
+    wall.rooms = [...ownerRoomIds];
+  }
+}
+
 function resolveExplicitWalls(
   segments: WallSegmentSpec[],
   moduleSize: number,
@@ -464,6 +515,10 @@ function resolveExplicitWalls(
 
     const side: WallSide = isVertical ? 'west' : 'south';
 
+    const hasOffset = [seg.from, seg.to].some(
+      p => 'grid' in p && (((p as WallPointGrid).dx ?? 0) !== 0 || ((p as WallPointGrid).dy ?? 0) !== 0)
+    );
+
     return {
       id: seg.id,
       side,
@@ -474,6 +529,8 @@ function resolveExplicitWalls(
       isExternal,
       thickness,
       rooms: [],
+      source: 'explicit' as const,
+      hasOffset,
     };
   });
 }
@@ -716,24 +773,47 @@ function findSharedWallBetweenSubRooms(
   const x0 = r.x, y0 = r.y, x1 = r.x + r.w, y1 = r.y + r.h;
   const EPS = 0.5;
 
-  // Find all explicit walls inside this parent room, clipped to parent bounds
+  // Find all walls strictly inside this parent room (not on perimeter).
+  // Use extractRoomPerimeterEdges to exclude walls that lie on the room's true outer boundary
+  // (which may be inside boundingRect for multi-rect rooms).
+  const perimeterEdges = extractRoomPerimeterEdges(parentRoom);
   const interiorWalls = walls.filter(w => {
-    if (w.rooms.length > 0) return false;
     const isVertical = Math.abs(w.x1 - w.x2) < EPS;
     const isHorizontal = Math.abs(w.y1 - w.y2) < EPS;
+    if (!isVertical && !isHorizontal) return false;
+
+    // Must be inside bounding rect (not on bounding edges)
     if (isVertical) {
       if (w.x1 <= x0 + EPS || w.x1 >= x1 - EPS) return false;
       const wMinY = Math.min(w.y1, w.y2);
       const wMaxY = Math.max(w.y1, w.y2);
-      return wMaxY > y0 + EPS && wMinY < y1 - EPS;
-    }
-    if (isHorizontal) {
+      if (!(wMaxY > y0 + EPS && wMinY < y1 - EPS)) return false;
+    } else {
       if (w.y1 <= y0 + EPS || w.y1 >= y1 - EPS) return false;
       const wMinX = Math.min(w.x1, w.x2);
       const wMaxX = Math.max(w.x1, w.x2);
-      return wMaxX > x0 + EPS && wMinX < x1 - EPS;
+      if (!(wMaxX > x0 + EPS && wMinX < x1 - EPS)) return false;
     }
-    return false;
+
+    // Exclude walls fully covered by the room's true perimeter (for multi-rect rooms).
+    // Walls that only partially overlap with perimeter are kept (e.g., L-shaped room
+    // partition that extends beyond the perimeter into the interior).
+    const wallPos = isVertical ? w.x1 : w.y1;
+    const wallStart = isVertical ? Math.min(w.y1, w.y2) : Math.min(w.x1, w.x2);
+    const wallEnd = isVertical ? Math.max(w.y1, w.y2) : Math.max(w.x1, w.x2);
+    const wallLen = wallEnd - wallStart;
+    const orient = isVertical ? 'vertical' : 'horizontal';
+    let perimeterCoverage = 0;
+    for (const edge of perimeterEdges) {
+      if (edge.orientation !== orient) continue;
+      if (Math.abs(edge.pos - wallPos) > EPS) continue;
+      const overlap = Math.min(wallEnd, edge.end) - Math.max(wallStart, edge.start);
+      if (overlap > EPS) perimeterCoverage += overlap;
+    }
+    // Only exclude if the wall is fully covered by perimeter edges
+    if (perimeterCoverage >= wallLen - EPS) return false;
+
+    return true;
   });
 
   if (interiorWalls.length === 0) return undefined;
@@ -748,6 +828,7 @@ function findSharedWallBetweenSubRooms(
   }
 
   // Strategy 2: Use sub_room rects to find the one on their shared boundary
+  // Also verify that the wall segment overlaps the shared range between rects
   const rect1 = sr1?.rect;
   const rect2 = sr2?.rect;
   if (rect1 && rect2) {
@@ -758,13 +839,29 @@ function findSharedWallBetweenSubRooms(
         const r2Left = Math.abs(rect2.x - w.x1) < EPS;
         const r1Left = Math.abs(rect1.x - w.x1) < EPS;
         const r2Right = Math.abs((rect2.x + rect2.w) - w.x1) < EPS;
-        if ((r1Right && r2Left) || (r1Left && r2Right)) return w;
+        if ((r1Right && r2Left) || (r1Left && r2Right)) {
+          // Verify Y-range overlap between wall and shared rect range
+          const sharedYStart = Math.max(rect1.y, rect2.y);
+          const sharedYEnd = Math.min(rect1.y + rect1.h, rect2.y + rect2.h);
+          const wMinY = Math.min(w.y1, w.y2);
+          const wMaxY = Math.max(w.y1, w.y2);
+          const overlap = Math.min(wMaxY, sharedYEnd) - Math.max(wMinY, sharedYStart);
+          if (overlap > EPS) return w;
+        }
       } else {
         const r1Top = Math.abs((rect1.y + rect1.h) - w.y1) < EPS;
         const r2Bottom = Math.abs(rect2.y - w.y1) < EPS;
         const r1Bottom = Math.abs(rect1.y - w.y1) < EPS;
         const r2Top = Math.abs((rect2.y + rect2.h) - w.y1) < EPS;
-        if ((r1Top && r2Bottom) || (r1Bottom && r2Top)) return w;
+        if ((r1Top && r2Bottom) || (r1Bottom && r2Top)) {
+          // Verify X-range overlap between wall and shared rect range
+          const sharedXStart = Math.max(rect1.x, rect2.x);
+          const sharedXEnd = Math.min(rect1.x + rect1.w, rect2.x + rect2.w);
+          const wMinX = Math.min(w.x1, w.x2);
+          const wMaxX = Math.max(w.x1, w.x2);
+          const overlap = Math.min(wMaxX, sharedXEnd) - Math.max(wMinX, sharedXStart);
+          if (overlap > EPS) return w;
+        }
       }
     }
   }

@@ -56,6 +56,8 @@ npm run validate -- --all
 ✗ samples/4ldk-complex-invalid.yaml
   ERROR [ISOLATED_SUBAREA] Room "bath" has an isolated sub-area (5.0m²) created by partition wall(s): w_bath_partition
   ERROR [ISOLATED_SUBAREA] Room "closet" has an isolated sub-area (3.3m²) created by partition wall(s): w_closet_shelf
+✓ samples/custom-walls-invalid.yaml
+  WARN  [GRID_MISALIGNMENT] Wall "w_custom_ext" is not aligned to 910mm grid (off-grid coordinates: 2500mm, 2500mm)
 ```
 
 エラーがある場合は exit code 1 を返す。
@@ -70,13 +72,17 @@ npm run validate -- --all
 | `SUB_ROOM_WITHOUT_DOOR` | warning | full partition のサブルームにドア接続がない |
 | `ISOLATED_SUBAREA` | error | additive壁が部屋を完全に二分割し、ドアのない側が孤立 |
 | `SKIPPED_OPENING` | error | 開口部がresolve時にスキップされた（存在しない部屋参照、共有壁なし等） |
+| `OPENING_OVERLAP` | warning | 同一壁面上で開口部同士が重複（1D区間で判定） |
+| `GRID_MISALIGNMENT` | warning | 明示壁の座標がモジュールグリッドに整合していない（grid+offsetによる意図的逸脱は除外） |
 | `EQUIPMENT_UNKNOWN_ROOM` | error | 設備の `room` が存在しない部屋IDを参照 |
 | `EQUIPMENT_OUT_OF_BOUNDS` | warning | 設備が部屋のバウンディング矩形からはみ出している |
 | `EQUIPMENT_OVERLAP` | warning | 同一部屋内で設備同士が重複 |
 | `EQUIPMENT_OPENING_WALL_OVERLAP` | warning | 設備と開口部（窓）が同一壁面上で重複 |
-| `EQUIPMENT_DOOR_CLEARANCE_BLOCKED` | warning | 設備がドアの開閉範囲（スイングクリアランス）を阻害 |
+| `EQUIPMENT_DOOR_CLEARANCE_BLOCKED` | error | 設備がドアの開閉範囲（スイングクリアランス）を阻害 |
 
 `ISOLATED_SUBAREA` は座標圧縮フラッドフィルで検出する。部分壁（部屋を完全には横断しない壁）は回り込めるため問題にならない。`sub_rooms` が定義されている部屋は `ISOLATED_SUBAREA` チェックをスキップする（サブルーム側のドア検証に委譲）。
+
+`OPENING_OVERLAP` は同一壁面上の開口部を壁軸方向の1D区間に射影し、sweep lineで重複を検出する。`GRID_MISALIGNMENT` は明示壁の座標がモジュールの整数倍かを検証する。`grid+offset` 形式（`dx`/`dy` 非ゼロ）で指定された壁は意図的な逸脱とみなし警告をスキップする。
 
 ## 面積表
 
@@ -478,6 +484,8 @@ archilang/
 部屋の辺を全て収集し、同一線上の辺をグループ化する。辺が 1 部屋のみに属する場合は外壁（厚い）、2 部屋で共有されている場合は内壁（薄い）として自動判定する。
 
 `geometry.walls.segments` で明示定義した壁は、`additive` モード（デフォルト）では自動抽出壁に追加され、`explicit_only` モードでは自動抽出を無効化して明示壁のみが使われる。
+
+明示壁には自動的に部屋の帰属（room ownership）が付与される。壁の線分が部屋の外周辺（perimeter edge）上にある場合、その部屋のIDが壁の `rooms` プロパティに追加される。multi-rect部屋の内部継ぎ目は外周に含まれないため、内部パーティション壁は `rooms: []` のまま維持される（内部壁の検出は `findBarriersInRoom` による幾何判定で行われる）。
 
 ### 座標系
 
