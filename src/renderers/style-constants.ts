@@ -44,10 +44,10 @@ export const GRID_EXTENSION_MM = GRID_DIM_OUTERMOST_MM + GRID_CLEARANCE_MM;
 export const GRID_LABEL_OFFSET_MM = GRID_DIM_OUTERMOST_MM + GRID_CLEARANCE_MM + 50;
 
 /** px — radius of the circle around X1/Y1 etc. labels */
-export const GRID_CIRCLE_RADIUS = 10;
+export const GRID_CIRCLE_RADIUS = 14;
 
 /** px — text size inside the gridline label circle */
-export const GRID_LABEL_FONT_SIZE = 10;
+export const GRID_LABEL_FONT_SIZE = 14;
 
 /** stroke color for gridlines, dimension lines, and label circles */
 export const GRID_STROKE_COLOR = '#666';
