@@ -1,5 +1,7 @@
 # archilang
 
+<video src="resources/movie.mp4" controls width="100%"></video>
+
 ARCHILANG YAML 仕様の間取りデータを SVG 平面図に変換する CLI ツール。
 
 ## 概要
