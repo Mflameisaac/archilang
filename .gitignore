@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .claude/
+.DS_Store
 output*.svg
 output*.html
 output*.area.json
