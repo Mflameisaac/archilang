@@ -1,49 +1,64 @@
 # archilang
 
-ARCHILANG YAML 仕様の間取りデータを SVG 平面図に変換する CLI ツール。
+A CLI tool that converts floor plan data written in the ARCHILANG YAML specification into SVG floor plans.
+
+> **Fork notice.** This is a fork of [4kk11/archilang](https://github.com/4kk11/archilang) (MIT, © 2026 4kk11), maintained by Krafftt. The README has been translated from Japanese to English. Functional changes on top of upstream: a library entry point with package `exports`, an opening-style alias table so specs can be authored in English as well as Japanese, and a `prepare` build script so the package is installable straight from a git URL.
 
 https://github.com/user-attachments/assets/ea6f60fa-00e9-45a0-94c4-95053672f335
 
-## 概要
+## Overview
 
-ARCHILANG フォーマット（YAML）で記述された建築間取り情報を読み込み、以下を自動生成する:
+Reads architectural floor plan information written in the ARCHILANG format (YAML) and generates:
 
-- **SVG 平面図** - 壁・窓・ドア・寸法線・方位記号・スケールバーを含むベクター図面
-- **HTML プレビュー** - ブラウザで即座に確認できるプレビューファイル
-- **面積表** - 壁芯面積の一覧表（YAML設定でSVG内テーブル表示、CLIオプションでJSON出力）
+- **SVG floor plan** — a vector drawing including walls, windows, doors, dimension lines, an orientation symbol and a scale bar
+- **HTML preview** — a preview file you can open in a browser immediately
+- **Area schedule** — a table of wall-centreline areas (rendered inside the SVG via YAML settings, or emitted as JSON via a CLI option)
 
-## クイックスタート
+## Quick start
 
 ```bash
-# 依存インストール
+# Install dependencies
 npm install
 
-# ビルド
+# Build
 npx tsc
 
-# サンプルを描画
+# Render the sample
 node dist/main.js
-# → output.svg, output.html が生成される
+# → generates output.svg and output.html
 
-# 任意の YAML を指定
+# Render a specific YAML file
 node dist/main.js path/to/plan.yaml output.svg
 
-# 面積表JSONを出力（.area.json）
+# Also emit the area schedule as JSON (.area.json)
 node dist/main.js path/to/plan.yaml output.svg --area-table
 ```
 
-## バリデーション
+## Using it as a library
 
-間取りデータの整合性を検証するコマンドを提供する。
+The rendering pipeline is exported from the package root. Every module reachable from that entry point is free of `node:` imports, so it is safe to bundle for the browser — the CLI (`main.ts`) and file watcher (`watcher.ts`) are deliberately not exported.
+
+```ts
+import { parseArchilang, resolveModel, validateBuilding, composeSvg } from 'archilang';
+
+const spec       = parseArchilang(yamlText);
+const model      = resolveModel(spec);
+const validation = validateBuilding(model);
+const svg        = composeSvg(model);
+```
+
+## Validation
+
+A command is provided to check the consistency of floor plan data.
 
 ```bash
-# 単一ファイル
+# Single file
 node dist/main.js validate samples/4ldk-complex-invalid.yaml
 
-# 複数ファイル
+# Multiple files
 node dist/main.js validate samples/basic-3room.yaml samples/4ldk-complex-invalid.yaml
 
-# 全サンプル一括
+# All samples at once
 node dist/main.js validate --all
 
 # npm script
@@ -51,7 +66,7 @@ npm run validate -- samples/4ldk-complex-invalid.yaml
 npm run validate -- --all
 ```
 
-出力例:
+Example output:
 
 ```
 ✓ samples/basic-3room.yaml
@@ -62,39 +77,39 @@ npm run validate -- --all
   WARN  [GRID_MISALIGNMENT] Wall "w_custom_ext" is not aligned to 910mm grid (off-grid coordinates: 2500mm, 2500mm)
 ```
 
-エラーがある場合は exit code 1 を返す。
+Returns exit code 1 when there are errors.
 
-### 検証ルール
+### Validation rules
 
-| コード | 重要度 | 内容 |
+| Code | Severity | Description |
 |--------|--------|------|
-| `UNKNOWN_ROOM_REF` | error | ドアの `connects` が存在しない部屋IDを参照 |
-| `UNREACHABLE_ROOM` | error | 外部入口からドアを辿って到達できない部屋（サブルーム含む） |
-| `ROOM_WITHOUT_DOOR` | warning | ドア接続が1つもない部屋 |
-| `SUB_ROOM_WITHOUT_DOOR` | warning | full partition のサブルームにドア接続がない |
-| `ISOLATED_SUBAREA` | error | additive壁が部屋を完全に二分割し、ドアのない側が孤立 |
-| `SKIPPED_OPENING` | error | 開口部がresolve時にスキップされた（存在しない部屋参照、共有壁なし等） |
-| `OPENING_OVERLAP` | warning | 同一壁面上で開口部同士が重複（1D区間で判定） |
-| `GRID_MISALIGNMENT` | warning | 明示壁の座標がモジュールグリッドに整合していない（grid+offsetによる意図的逸脱は除外） |
-| `EQUIPMENT_UNKNOWN_ROOM` | error | 設備の `room` が存在しない部屋IDを参照 |
-| `EQUIPMENT_OUT_OF_BOUNDS` | warning | 設備が部屋のバウンディング矩形からはみ出している |
-| `EQUIPMENT_OVERLAP` | warning | 同一部屋内で設備同士が重複 |
-| `EQUIPMENT_OPENING_WALL_OVERLAP` | warning | 設備と開口部（窓）が同一壁面上で重複 |
-| `EQUIPMENT_DOOR_CLEARANCE_BLOCKED` | error | 設備がドアの開閉範囲（スイングクリアランス）を阻害 |
+| `UNKNOWN_ROOM_REF` | error | A door's `connects` references a room ID that does not exist |
+| `UNREACHABLE_ROOM` | error | A room (including sub-rooms) cannot be reached from an external entrance by following doors |
+| `ROOM_WITHOUT_DOOR` | warning | A room with no door connections at all |
+| `SUB_ROOM_WITHOUT_DOOR` | warning | A sub-room created by a full partition has no door connection |
+| `ISOLATED_SUBAREA` | error | An additive wall divides a room completely in two and the side without a door is isolated |
+| `SKIPPED_OPENING` | error | An opening was skipped during resolution (references a non-existent room, no shared wall, etc.) |
+| `OPENING_OVERLAP` | warning | Openings overlap each other on the same wall face (judged as 1D intervals) |
+| `GRID_MISALIGNMENT` | warning | An explicit wall's coordinates are not aligned to the module grid (deliberate deviations via grid+offset are excluded) |
+| `EQUIPMENT_UNKNOWN_ROOM` | error | A fixture's `room` references a room ID that does not exist |
+| `EQUIPMENT_OUT_OF_BOUNDS` | warning | A fixture extends outside its room's bounding rectangle |
+| `EQUIPMENT_OVERLAP` | warning | Fixtures overlap each other within the same room |
+| `EQUIPMENT_OPENING_WALL_OVERLAP` | warning | A fixture and an opening (window) overlap on the same wall face |
+| `EQUIPMENT_DOOR_CLEARANCE_BLOCKED` | error | A fixture obstructs a door's swing clearance |
 
-`ISOLATED_SUBAREA` は座標圧縮フラッドフィルで検出する。部分壁（部屋を完全には横断しない壁）は回り込めるため問題にならない。`sub_rooms` が定義されている部屋は `ISOLATED_SUBAREA` チェックをスキップする（サブルーム側のドア検証に委譲）。
+`ISOLATED_SUBAREA` is detected with a coordinate-compressed flood fill. Partial walls (walls that do not fully cross the room) can be walked around, so they are not a problem. Rooms that define `sub_rooms` skip the `ISOLATED_SUBAREA` check, delegating to door validation on the sub-room side.
 
-`OPENING_OVERLAP` は同一壁面上の開口部を壁軸方向の1D区間に射影し、sweep lineで重複を検出する。`GRID_MISALIGNMENT` は明示壁の座標がモジュールの整数倍かを検証する。`grid+offset` 形式（`dx`/`dy` 非ゼロ）で指定された壁は意図的な逸脱とみなし警告をスキップする。
+`OPENING_OVERLAP` projects openings on the same wall face onto a 1D interval along the wall axis and detects overlaps with a sweep line. `GRID_MISALIGNMENT` checks whether an explicit wall's coordinates are integer multiples of the module. Walls specified in `grid+offset` form (non-zero `dx`/`dy`) are treated as deliberate deviations and skip the warning.
 
-## JSON バリデーション出力
+## JSON validation output
 
-`--format json` オプションで、バリデーション結果を構造化JSONで出力できる。各issueに `fix_hint`（修正指示）と `auto_fixable`（自動修正可能か）が付与される。
+The `--format json` option emits validation results as structured JSON. Each issue carries `fix_hint` (repair instruction) and `auto_fixable`.
 
 ```bash
 node dist/main.js validate samples/custom-walls-invalid.yaml --format json
 ```
 
-出力例:
+Example output:
 
 ```json
 {
@@ -115,19 +130,19 @@ node dist/main.js validate samples/custom-walls-invalid.yaml --format json
 }
 ```
 
-## inspect コマンド
+## The `inspect` command
 
-間取りデータの構造を JSON で出力する。部屋グラフ、隣接関係、占有グリッド、面積、壁一覧を含む。
+Outputs the structure of the floor plan data as JSON: the room graph, adjacency relationships, occupancy grid, areas and wall list.
 
 ```bash
-# JSON出力
+# JSON output
 node dist/main.js inspect samples/basic-3room.yaml
 
-# ASCIIマップ表示
+# ASCII map display
 node dist/main.js inspect samples/basic-3room.yaml --ascii-map
 ```
 
-ASCIIマップ出力例:
+Example ASCII map output:
 
 ```
      0   1   2   3   4   5   6   7
@@ -142,33 +157,33 @@ ASCIIマップ出力例:
   +-------------------+-------------------+
 ```
 
-JSON出力に含まれるフィールド:
+Fields included in the JSON output:
 
-| フィールド | 内容 |
+| Field | Description |
 |-----------|------|
-| `grid` | モジュールサイズ、グリッド総数、スパン |
-| `rooms` | 部屋一覧（面積、畳数、隣接部屋、壁リスト） |
-| `adjacency` | ドア接続による隣接グラフ |
-| `occupancyGrid` | グリッド座標ごとの部屋ID |
-| `walls` | 壁一覧（rooms、isExternal、source） |
-| `openings` | 開口部一覧（connectedRooms、wallId） |
+| `grid` | Module size, total grid counts, spans |
+| `rooms` | Room list (area, tatami count, adjacent rooms, wall list) |
+| `adjacency` | Adjacency graph formed by door connections |
+| `occupancyGrid` | Room ID per grid coordinate |
+| `walls` | Wall list (rooms, isExternal, source) |
+| `openings` | Opening list (connectedRooms, wallId) |
 
-## solve コマンド
+## The `solve` command
 
-バリデーションエラーの自動修正を試みる。`validate → auto-fix → revalidate` のループを実行する。
+Attempts to automatically repair validation errors, running a `validate → auto-fix → revalidate` loop.
 
 ```bash
-# ドライラン（修正内容を表示するが適用しない）
+# Dry run (shows the fixes but does not apply them)
 node dist/main.js solve samples/custom-walls-invalid.yaml --dry-run
 
-# 修正を適用して出力
+# Apply fixes and write output
 node dist/main.js solve samples/custom-walls-invalid.yaml --out fixed.yaml
 
-# 最大反復回数を指定
+# Specify the maximum number of iterations
 node dist/main.js solve plan.yaml --max-iter 3 --out fixed.yaml
 ```
 
-出力例:
+Example output:
 
 ```
 Iteration 1: Snapped wall "w_custom_ext" to grid: 2500→2730, 2500→2730
@@ -179,48 +194,50 @@ Final: 3 error(s), 0 warning(s), ok=false
 Fixed YAML written to: fixed.yaml
 ```
 
-### 自動修正ルール (v1)
+### Auto-fix rules (v1)
 
-| エラーコード | 修正内容 | 条件 |
+| Error code | Fix applied | Conditions |
 |-------------|---------|------|
-| `GRID_MISALIGNMENT` | 明示壁の座標を最寄りグリッドにスナップ | `hasOffset=false`、スナップ距離がモジュール/2以内 |
-| `ROOM_WITHOUT_DOOR` | 隣接部屋との共有壁にドアを自動追加 | 共有壁あり、既存開口部なし |
+| `GRID_MISALIGNMENT` | Snap the explicit wall's coordinates to the nearest grid line | `hasOffset=false`, snap distance within module/2 |
+| `ROOM_WITHOUT_DOOR` | Automatically add a door on a wall shared with an adjacent room | A shared wall exists and has no existing openings |
 
-自動修正不可能なエラー（`UNREACHABLE_ROOM`, `ISOLATED_SUBAREA` 等）は手動修正が必要。`validate --format json` の `fix_hint` フィールドが修正の手がかりになる。
+Errors that cannot be auto-fixed (`UNREACHABLE_ROOM`, `ISOLATED_SUBAREA`, etc.) require manual correction. The `fix_hint` field from `validate --format json` gives you the clue for the repair.
 
-## 面積表
+## Area schedule
 
-面積表は2つの出力方式がある:
+There are two output methods:
 
-- **SVG 内テーブル** — YAML の `rendering.area_table.enabled: true` で図面右側に描画
-- **JSON ファイル** — CLI の `--area-table` オプションで `.area.json` を出力
+- **Table inside the SVG** — drawn to the right of the plan when `rendering.area_table.enabled: true` is set in the YAML
+- **JSON file** — emits `.area.json` via the CLI's `--area-table` option
 
 ```yaml
-# YAML で SVG 面積表を有効化
+# Enable the SVG area schedule in YAML
 rendering:
   area_table:
     enabled: true
 ```
 
 ```bash
-# JSON 出力のみ（SVG 面積表は YAML 設定に従う）
+# JSON output only (the SVG table follows the YAML setting)
 node dist/main.js samples/4ldk-complex.yaml output.svg --area-table
 # → output.area.json
 ```
 
-### SVG 面積表
+### SVG area schedule
 
-図面右側に以下の列を持つテーブルを描画:
+A table with the following columns is drawn to the right of the plan:
 
-| 列 | 内容 |
+| Column | Description |
 |----|------|
-| 部屋 | 部屋名（サブルームはインデント表示） |
-| m² | 壁芯面積（平方メートル） |
-| 畳 | 畳数（1畳 = 2×module² = 1.6562m²） |
+| Room | Room name (sub-rooms are indented) |
+| m² | Wall-centreline area (square metres) |
+| Tatami | Tatami count (1 tatami = 2 × module² = 1.6562 m²) |
 
-最下行に「延床面積」（トップレベル部屋の面積合計）を表示。サブルームの面積は親部屋に含まれるため合計には加算しない。
+The bottom row shows the total floor area (the sum of top-level room areas). Sub-room areas are included in their parent room, so they are not added to the total.
 
-### JSON 出力 (`.area.json`)
+> **Note for non-shaku modules.** The tatami unit is derived from the module size (`2 × module²`), which is only correct at the 910mm shaku module. With a different module — a 500mm metric grid, say — the tatami column reports a meaningless number. Treat that column as shaku-specific.
+
+### JSON output (`.area.json`)
 
 ```json
 {
@@ -235,27 +252,27 @@ node dist/main.js samples/4ldk-complex.yaml output.svg --area-table
 }
 ```
 
-### 面積計算方式
+### Area calculation method
 
-- **壁芯面積**: 各部屋の `grid_rect` / `grid_rects` の矩形合計（`Σ(w × h) × module²`）
-- サブルームの面積はフラッドフィルまたはジオメトリック分割で算出した `areaMm2` を使用
-- 延床面積 = トップレベル部屋の壁芯面積合計
+- **Wall-centreline area**: the sum of each room's `grid_rect` / `grid_rects` rectangles (`Σ(w × h) × module²`)
+- Sub-room areas use the `areaMm2` computed by flood fill or geometric subdivision
+- Total floor area = the sum of top-level rooms' wall-centreline areas
 
-## 処理パイプライン
+## Processing pipeline
 
 ```
-YAML ──→ parseArchilang() ──→ Archilang (型付きデータ)
+YAML ──→ parseArchilang() ──→ Archilang (typed data)
                                   │
                            resolve(spec) ──→ BuildingModel
-                                  │            ├ rooms     (グリッド→mm変換済)
-                                  │            ├ walls     (外壁/内壁を自動判定)
-                                  │            ├ subRooms  (フラッドフィルで領域算出)
-                                  │            ├ openings  (壁上の位置を解決)
-                                  │            └ equipment (壁寄せ配置を解決)
+                                  │            ├ rooms     (grid → mm converted)
+                                  │            ├ walls     (external/internal auto-detected)
+                                  │            ├ subRooms  (regions computed by flood fill)
+                                  │            ├ openings  (positions resolved on walls)
+                                  │            └ equipment (wall-aligned placement resolved)
                                   │
                         validateBuilding(model) ──→ ValidationResult
                                   │
-                           composeSvg(model) ──→ SVG文字列
+                           composeSvg(model) ──→ SVG string
                                   │
                            ┌──────┼──────┐
                            │      │      │
@@ -267,63 +284,65 @@ YAML ──→ parseArchilang() ──→ Archilang (型付きデータ)
                                   │
                            ┌──────┴──────┐
                        output.svg   output.html
-                                    output.area.json (--area-table時)
+                                    output.area.json (with --area-table)
 ```
 
-## ARCHILANG YAML 仕様 (v0.3)
+## ARCHILANG YAML specification (v0.3)
 
-### 基本構造
+### Basic structure
 
 ```yaml
 archilang: "0.2"
 
 site:
-  orientation: south          # 建物の正面方位 (north / south / east / west)
+  orientation: south          # front elevation of the building (north / south / east / west)
 
 building:
-  structure: 木造軸組
-  module: shaku               # 尺モジュール (910mm)
+  structure: 木造軸組          # free-form string (e.g. "masonry", "timber frame")
+  module: shaku               # shaku module (910mm)
   stories: 1
   defaults:
     ceiling_height: 2400mm
     external_wall:
-      thickness: 130mm        # 外壁厚
+      thickness: 130mm        # external wall thickness
     internal_wall:
-      partition: 90mm         # 内壁厚 (間仕切り)
+      partition: 90mm         # internal wall thickness (partition)
 ```
 
-### レンダリングオプション
+`structure` and `module` are free-form strings and are not restricted to Japanese construction terms. The grid actually used for geometry comes from `geometry.grids.module`, so a metric plan simply sets that to e.g. `500mm`.
+
+### Rendering options
 
 ```yaml
 rendering:
   grid_lines:
-    enabled: true            # 通り芯（構造グリッド線）の表示 (デフォルト: false)
+    enabled: true            # show structural grid lines (default: false)
   area_table:
-    enabled: true            # SVG 図面右側に面積表を描画 (デフォルト: false)
+    enabled: true            # draw the area schedule to the right of the plan (default: false)
 ```
 
-### グリッド定義
+### Grid definition
 
-グリッドはモジュール単位（910mm）のスパンで定義する。
+Grids are defined as spans in module units (910mm).
 
 ```yaml
 geometry:
   grids:
     module: 910mm
     1F:
-      x_spans: [3, 5]        # X方向: 3モジュール + 5モジュール = 合計8
-      y_spans: [4, 3]        # Y方向: 4モジュール + 3モジュール = 合計7
+      x_spans: [3, 5]        # X direction: 3 modules + 5 modules = 8 total
+      y_spans: [4, 3]        # Y direction: 4 modules + 3 modules = 7 total
 ```
 
-### 部屋定義
+### Room definition
 
-`grid_rect` でグリッド座標上の矩形を指定する。原点は左下。
+Use `grid_rect` to specify a rectangle in grid coordinates. The origin is bottom-left.
 
 ```yaml
 rooms:
   - id: ldk
     floor: 1F
-    type: LDK                # 表示名（日本語可）
+    type: LDK                # display name (Japanese permitted)
     grid_rect: { x: 3, y: 0, w: 5, h: 7 }
 
   - id: bedroom
@@ -332,30 +351,30 @@ rooms:
     grid_rect: { x: 0, y: 3, w: 3, h: 4 }
 ```
 
-#### 非矩形部屋 (multi-rect)
+#### Non-rectangular rooms (multi-rect)
 
-L字型・T字型など非矩形の部屋は `grid_rects`（複数形）で複数の矩形の和集合として定義する。
+Non-rectangular rooms such as L-shapes and T-shapes are defined with `grid_rects` (plural) as the union of several rectangles.
 
 ```yaml
 rooms:
-  # L字型LDK（2矩形合成）
+  # L-shaped LDK (composed of 2 rectangles)
   - id: ldk
     floor: 1F
     type: LDK
     grid_rects:
-      - { x: 0, y: 0, w: 7, h: 4 }   # 南側の横長部分
-      - { x: 3, y: 4, w: 4, h: 3 }    # 北東に突き出す部分
+      - { x: 0, y: 0, w: 7, h: 4 }   # the wide southern portion
+      - { x: 3, y: 4, w: 4, h: 3 }    # the portion projecting to the north-east
 ```
 
-**制約:**
-- `grid_rect`（単数）と `grid_rects`（複数）は排他。両方指定はエラー
-- `grid_rects` 内の矩形同士は辺で接続されていること（重複はエラー）
-- 各矩形の和集合が部屋の形状となり、壁は外周辺のみ自動抽出される
-- multi-rect 部屋でも `sub_rooms` に対応。full partition はフラッドフィル、partial partition はセルベース分割で領域を算出する
+**Constraints:**
+- `grid_rect` (singular) and `grid_rects` (plural) are mutually exclusive; specifying both is an error
+- Rectangles within `grid_rects` must connect along an edge (overlaps are an error)
+- The union of the rectangles forms the room shape, and walls are extracted only along the outer perimeter
+- Multi-rect rooms also support `sub_rooms`. Full partitions use flood fill; partial partitions use cell-based subdivision to compute regions
 
-### サブルーム定義 (sub_rooms)
+### Sub-room definition (`sub_rooms`)
 
-明示壁で部屋を分割した際、各サブエリアに個別の名前・ラベル・面積を割り当てる。`seed` で指定したグリッド座標がどのサブエリアに属するかをフラッドフィルで判定する。
+When a room is divided by explicit walls, assign an individual name, label and area to each sub-area. A flood fill determines which sub-area the grid coordinate given in `seed` belongs to.
 
 ```yaml
 rooms:
@@ -366,143 +385,148 @@ rooms:
     sub_rooms:
       - id: bath_tub
         type: 浴室
-        seed: { x: 5, y: 5 }    # 壁の西側に属する任意のグリッド座標
+        seed: { x: 5, y: 5 }    # any grid coordinate belonging to the west side of the wall
       - id: wash
         type: 洗面
-        seed: { x: 7, y: 5 }    # 壁の東側に属する任意のグリッド座標
+        seed: { x: 7, y: 5 }    # any grid coordinate belonging to the east side of the wall
 ```
 
-**ポイント:**
+**Key points:**
 
-- `seed` はサブエリア内の任意の1点（グリッド座標）。フラッドフィルでそのシードから到達可能な領域がサブルームの範囲・面積になる
-- N分割に対応（2分割に限らず、壁の数とシードの数で任意分割可能）
-- 壁が部屋を完全に分割する場合（**full partition**）: フラッドフィルで各サブエリアの正確な範囲を算出
-- 壁が部屋を完全には分割しない場合（**partial partition**、例: カウンター壁）: 壁の位置をカットラインとしてジオメトリック分割にフォールバック
-- サブルームIDはドアの `connects` で直接参照可能。ドアの壁検索は自動的に親部屋にフォールバックする
-- ラベルは親部屋ではなく各サブルームの中心に個別表示される
-- サブルームIDと部屋IDはグローバルに一意でなければならない
+- `seed` is any single point (grid coordinate) inside the sub-area. The region reachable from that seed by flood fill becomes the sub-room's extent and area
+- N-way division is supported (not limited to two — any number of divisions is possible given the walls and seeds)
+- When a wall divides the room completely (**full partition**): flood fill computes the exact extent of each sub-area
+- When a wall does not divide the room completely (**partial partition**, e.g. a counter wall): falls back to geometric subdivision using the wall position as a cut line
+- Sub-room IDs can be referenced directly by a door's `connects`. Wall lookup for doors automatically falls back to the parent room
+- Labels are displayed individually at the centre of each sub-room rather than at the parent room
+- Sub-room IDs and room IDs must be globally unique
 
-### 明示壁定義
+### Explicit wall definition
 
-`geometry.walls` セクションで、グリッドに依存しない壁を明示的に定義できる。自動抽出壁と共存する `additive`（デフォルト）と、自動抽出を無効化する `explicit_only` モードがある。
+The `geometry.walls` section lets you define walls explicitly, independent of the grid. There is an `additive` mode (default) that coexists with auto-extracted walls, and an `explicit_only` mode that disables auto-extraction.
 
 ```yaml
 geometry:
   walls:
-    mode: additive          # additive (デフォルト) | explicit_only
+    mode: additive          # additive (default) | explicit_only
     segments:
-      # mm座標で直接指定
+      # specified directly in mm coordinates
       - id: w_partition
         floor: 1F
         from: { x: 1820, y: 0 }
         to: { x: 1820, y: 3640 }
-        thickness: 90mm     # 省略時: type に応じたデフォルト値
-        type: internal      # external (デフォルト) | internal
-        grid_line: true     # この壁の位置に通り芯を追加
+        thickness: 90mm     # if omitted: the default for the given type
+        type: internal      # external (default) | internal
+        grid_line: true     # add a structural grid line at this wall's position
 
-      # グリッド座標 + オフセットで指定
+      # specified as grid coordinates + offset
       - id: w_offset
         floor: 1F
         from: { grid: { x: 4, y: 4 }, dx: 150, dy: 0 }
         to: { grid: { x: 4, y: 7 }, dx: 150, dy: 0 }
 
-      # from/to で mm とgrid+offset の混在も可
+      # mm and grid+offset may be mixed across from/to
       - id: w_mixed
         floor: 1F
         from: { grid: { x: 3, y: 0 }, dx: 150, dy: 0 }
         to: { x: 2880, y: 6370 }
 ```
 
-**壁端点の指定方法:**
+**Ways to specify wall endpoints:**
 
-| 方式 | 記法 | 説明 |
+| Method | Notation | Description |
 |------|------|------|
-| mm直接 | `{ x: 2730, y: 0 }` | mm座標を直接指定 |
-| グリッド | `{ grid: { x: 3, y: 0 } }` | グリッド位置にスナップ |
-| グリッド+オフセット | `{ grid: { x: 3, y: 0 }, dx: 150, dy: 0 }` | グリッド位置からmm単位でオフセット |
+| Direct mm | `{ x: 2730, y: 0 }` | Specify mm coordinates directly |
+| Grid | `{ grid: { x: 3, y: 0 } }` | Snap to a grid position |
+| Grid + offset | `{ grid: { x: 3, y: 0 }, dx: 150, dy: 0 }` | Offset in mm from a grid position |
 
-**オプション:**
+**Options:**
 
-| フィールド | 型 | デフォルト | 説明 |
+| Field | Type | Default | Description |
 |-----------|------|----------|------|
-| `thickness` | `string` | type に応じた値 | 壁厚 (例: `"90mm"`) |
-| `type` | `string` | `"external"` | `"external"` または `"internal"` |
-| `grid_line` | `boolean` | `false` | `true` にすると壁の位置に通り芯を追加。ラベルはスパン境界の通り芯と統合され位置順に連番 (X1, X2, ...)。通り芯位置がスパン境界と異なる場合、通り芯間距離を示す寸法行が自動追加される |
+| `thickness` | `string` | depends on type | Wall thickness (e.g. `"90mm"`) |
+| `type` | `string` | `"external"` | `"external"` or `"internal"` |
+| `grid_line` | `boolean` | `false` | When `true`, adds a structural grid line at the wall's position. Labels are merged with the span-boundary grid lines and numbered in positional order (X1, X2, …). When the grid line position differs from a span boundary, a dimension row showing the distance between grid lines is added automatically |
 
-**制約:**
-- 壁は直交（水平または垂直）のみ。斜め壁はエラー
-- ゼロ長の壁はエラー
-- グリッド座標は有効範囲内（`0` 〜 グリッド合計値）でなければエラー
-- 壁IDは一意でなければならない（自動抽出壁の `wall_N` と重複不可）
+**Constraints:**
+- Walls must be orthogonal (horizontal or vertical). Diagonal walls are an error
+- Zero-length walls are an error
+- Grid coordinates must be within the valid range (`0` to the grid total), otherwise an error
+- Wall IDs must be unique (they must not collide with the auto-extracted `wall_N`)
 
-### 開口部定義
+### Opening definition
 
-窓・ドアは以下の 2 パターンで配置できる:
+Windows and doors can be placed in two ways:
 
-**壁指定型** - 特定の部屋の壁に配置
+**Wall-specified** — placed on a specific room's wall
 
 ```yaml
 - id: W1
-  type: AW                   # AW=アルミ窓, WD=木製ドア, AD=アルミドア
-  style: 引違い窓            # 引違い窓 / 片開き / 引き戸
+  type: AW                   # AW = aluminium window, WD = wooden door, AD = aluminium door
+  style: 引違い窓             # see the style table below
   room: ldk
-  wall: south                # 配置する壁 (north / south / east / west)
-  position: center           # center または { offset: 500 } (壁始点からmm)
-  size: { w: 2530, h: 2000 } # mm単位
-  sill: 0                    # 窓台高さ (mm)
+  wall: south                # which wall to place it on (north / south / east / west)
+  position: center           # center, or { offset: 500 } (mm from the wall's start point)
+  size: { w: 2530, h: 2000 } # in mm
+  sill: 0                    # sill height (mm)
 ```
 
-**接続型** - 2部屋間の共有壁にドアを配置
+**Connection-specified** — places a door on the wall shared between two rooms
 
 ```yaml
 - id: D1
   type: WD
   style: 片開き
-  connects: [bedroom, ldk]   # 部屋IDのペア
+  connects: [bedroom, ldk]   # a pair of room IDs
   size: { w: 800, h: 2000 }
 
-# 引き戸（狭小空間に適した開閉方式）
+# Sliding door (an opening method suited to tight spaces)
 - id: D4
   type: WD
   style: 引き戸
   connects: [wash, ldk]
   size: { w: 800, h: 2000 }
 
-# サブルームIDも指定可能
+# Sub-room IDs may also be specified
 - id: D5
   type: WD
   style: 片開き
-  connects: [hall, wash]      # 通常部屋 ↔ サブルーム
+  connects: [hall, wash]      # ordinary room ↔ sub-room
   size: { w: 700, h: 2000 }
 
 - id: D6
   type: WD
   style: 片開き
-  connects: [wash, bath_tub]  # 同一親内のサブルーム同士
+  connects: [wash, bath_tub]  # sub-room ↔ sub-room within the same parent
   size: { w: 700, h: 2000 }
 ```
 
-**開口部スタイル:**
+**Opening styles:**
 
-| スタイル | 描画 | 用途 |
-|---------|------|------|
-| `引違い窓` | 青い平行線（ガラス2枚） | 窓 |
-| `片開き` | ヒンジ点 + 弧（破線） | 開き戸 |
-| `引き戸` | パネル線（実線）+ レール線（破線） | スライドドア |
+Each style resolves to a canonical kind through an alias table, so it may be written in either Japanese or English. Case, underscores and spaces are equivalent (`sliding_door`, `Sliding Door` and `sliding-door` all match).
 
-### 設備定義
+| Canonical kind | Accepted spellings | Drawn as | Used for |
+|---------|---------|------|------|
+| sliding window | `引違い窓`, `引き違い窓`, `sliding-window` | Blue parallel lines (two panes of glass) | Windows |
+| swing | `片開き`, `片開き戸`, `swing`, `swing-door`, `hinged` | Hinge point + arc (dashed) | Hinged doors |
+| sliding door | `引き戸`, `引戸`, `sliding-door` | Panel line (solid) + rail line (dashed) | Sliding doors |
+| fixed window | `FIX窓`, `fixed-window` | *(no renderer yet — draws nothing)* | Fixed windows |
 
-`geometry.equipment` で水回り設備を部屋の壁に沿って配置する。開口部と同じ `wall` + `position` パターンを使用する。
+An unrecognised style resolves to `unknown` and draws nothing, rather than raising an error.
+
+### Fixture definition
+
+`geometry.equipment` places sanitary and kitchen fixtures along a room's walls, using the same `wall` + `position` pattern as openings.
 
 ```yaml
 geometry:
   equipment:
     - id: K1
-      type: kitchen_counter     # 設備種別（プリセットから選択）
-      room: ldk                 # 配置先ルームID
-      wall: south               # 壁寄せ方向 (north / south / east / west)
-      position: { offset: 0 }   # 壁始点からの横方向オフセット (mm) or "center"
-      size: { w: 1800, h: 650 } # オプション — 省略時はプリセットのデフォルトサイズ
+      type: kitchen_counter     # fixture type (chosen from the presets)
+      room: ldk                 # target room ID
+      wall: south               # which wall to align to (north / south / east / west)
+      position: { offset: 0 }   # lateral offset from the wall's start point (mm), or "center"
+      size: { w: 1800, h: 650 } # optional — defaults to the preset size when omitted
 
     - id: UB1
       type: unit_bath
@@ -517,153 +541,162 @@ geometry:
       position: { offset: 200 }
 ```
 
-**設備プリセット:**
+**Fixture presets:**
 
-| type | 表示名 | デフォルトサイズ (w×h mm) | SVGシンボル |
+| type | Label | Default size (w×h mm) | SVG symbol |
 |------|--------|-------------------------|------------|
-| `kitchen_counter` | キッチン | 2550×650 | カウンター + シンク楕円 + コンロ□□ |
-| `unit_bath` | UB | 1600×1600 | 外枠 + 浴槽（角丸）+ 洗い場 |
-| `toilet` | 便器 | 450×700 | タンク矩形 + ボウル楕円 |
-| `washbasin` | 洗面 | 750×550 | カウンター + ボウル楕円 |
-| `washing_machine` | 洗濯機 | 640×640 | パン矩形 + ドラム円 |
-| `refrigerator` | 冷蔵庫 | 685×650 | 矩形 + ×マーク |
+| `kitchen_counter` | キッチン (kitchen) | 2550×650 | Counter + sink ellipse + hob □□ |
+| `unit_bath` | UB | 1600×1600 | Outer frame + bathtub (rounded) + washing area |
+| `toilet` | 便器 (WC pan) | 450×700 | Cistern rectangle + bowl ellipse |
+| `washbasin` | 洗面 (washbasin) | 750×550 | Counter + bowl ellipse |
+| `washing_machine` | 洗濯機 (washing machine) | 640×640 | Tray rectangle + drum circle |
+| `refrigerator` | 冷蔵庫 (refrigerator) | 685×650 | Rectangle + × mark |
 
-- `w` は壁に沿った方向の寸法、`h` は壁から離れる方向の奥行き
-- `size` を指定するとプリセットのデフォルトサイズをオーバーライドできる
-- 設備は壁の内面に密着して配置される（gap: 0mm）
-- 壁方向に応じて設備の向きが自動決定される
+- `w` is the dimension along the wall; `h` is the depth away from the wall
+- Specifying `size` overrides the preset's default size
+- Fixtures are placed flush against the inner face of the wall (gap: 0mm)
+- Fixture orientation is determined automatically from the wall direction
 
-## SVG レイヤー構成
+> Preset labels are currently Japanese and are rendered into the SVG as-is.
 
-SVG は以下のレイヤーで構成される（描画順）:
+## SVG layer structure
 
-| レイヤー | ID | 内容 |
+The SVG is composed of the following layers (in drawing order):
+
+| Layer | ID | Contents |
 |----------|-----|------|
-| グリッド | `grid` | モジュール間隔の参照グリッド線（破線） |
-| 壁 | `walls` | 外壁（濃色・太線）と内壁（淡色・細線）の矩形 |
-| 設備 | `equipment` | 水回り設備シンボル（グレー・細線） |
-| 開口部 | `openings` | 引違い窓（青い平行線）、片開きドア（ヒンジ+弧）、引き戸（パネル+レール） |
-| ラベル | `labels` | 部屋名・面積 (m²)・畳数 |
-| 通り芯間寸法 | `gridline-dimensions` | 通り芯間の距離（通り芯がスパン境界と異なる場合のみ表示、最内側行） |
-| 寸法線 | `dimensions` | X/Y 方向のスパン寸法＋合計寸法（各端点に黒ポチ付き） |
-| メタ | `meta` | 方位記号（コンパス）とスケールバー (1m / S=1:100) |
-| 通り芯 | `gridlines` | 構造グリッド線（一点鎖線）＋両端の丸ラベル（`rendering.grid_lines.enabled: true` 時のみ） |
-| 面積表 | `area-table` | 壁芯面積の一覧テーブル（`rendering.area_table.enabled: true` 時のみ） |
+| Grid | `grid` | Reference grid lines at module intervals (dashed) |
+| Walls | `walls` | Rectangles for external walls (dark, thick) and internal walls (light, thin) |
+| Fixtures | `equipment` | Sanitary/kitchen fixture symbols (grey, thin) |
+| Openings | `openings` | Sliding windows (blue parallel lines), hinged doors (hinge + arc), sliding doors (panel + rail) |
+| Labels | `labels` | Room name, area (m²), tatami count |
+| Grid-line dimensions | `gridline-dimensions` | Distances between structural grid lines (shown only when a grid line differs from a span boundary; innermost row) |
+| Dimensions | `dimensions` | X/Y span dimensions plus overall dimensions (with a dot at each endpoint) |
+| Meta | `meta` | Orientation symbol (compass) and scale bar (1m / S=1:100) |
+| Structural grid lines | `gridlines` | Structural grid lines (dash-dot) + round labels at both ends (only when `rendering.grid_lines.enabled: true`) |
+| Area schedule | `area-table` | Wall-centreline area table (only when `rendering.area_table.enabled: true`) |
 
-## ディレクトリ構成
+## Directory structure
 
 ```
 archilang/
 ├── src/
-│   ├── main.ts              # CLI エントリポイント
-│   ├── parser.ts            # YAML パース・バリデーション
-│   ├── resolver.ts          # グリッド→mm変換、壁抽出、開口部解決、サブルーム解決
-│   ├── flood-fill.ts        # 座標圧縮フラッドフィル（resolver・validator共用）
-│   ├── svg-composer.ts      # レイヤー合成・SVG生成
-│   ├── svg-utils.ts         # 座標変換 (mmToSvg)、エスケープ
-│   ├── area-table.ts        # 面積計算・JSON出力
-│   ├── validator.ts          # 接続性・サブルームドア・孤立サブエリア・設備検証
-│   ├── fix-hints.ts         # バリデーションJSON出力・修正ヒント生成
-│   ├── inspect.ts           # inspect コマンド（部屋グラフ・占有グリッド・隣接関係）
-│   ├── ascii-map.ts         # ASCIIマップレンダリング
-│   ├── auto-fix.ts          # ルールベース自動修正（GRID_MISALIGNMENT, ROOM_WITHOUT_DOOR）
-│   ├── solve.ts             # solve コマンド（自動修正ループオーケストレータ）
-│   ├── types.ts             # 全型定義
-│   ├── equipment-presets.ts  # 設備プリセット定義（6種）
-│   ├── __tests__/                 # vitest テスト
+│   ├── index.ts             # library entry point (browser-safe exports)
+│   ├── main.ts              # CLI entry point
+│   ├── parser.ts            # YAML parsing and validation
+│   ├── resolver.ts          # grid→mm conversion, wall extraction, opening and sub-room resolution
+│   ├── flood-fill.ts        # coordinate-compressed flood fill (shared by resolver and validator)
+│   ├── svg-composer.ts      # layer composition and SVG generation
+│   ├── svg-utils.ts         # coordinate transforms (mmToSvg), escaping
+│   ├── area-table.ts        # area calculation and JSON output
+│   ├── validator.ts         # connectivity, sub-room doors, isolated sub-areas, fixture validation
+│   ├── opening-styles.ts    # opening style alias table (Japanese/English → canonical kind)
+│   ├── fix-hints.ts         # validation JSON output and fix-hint generation
+│   ├── inspect.ts           # inspect command (room graph, occupancy grid, adjacency)
+│   ├── ascii-map.ts         # ASCII map rendering
+│   ├── auto-fix.ts          # rule-based auto-repair (GRID_MISALIGNMENT, ROOM_WITHOUT_DOOR)
+│   ├── solve.ts             # solve command (auto-fix loop orchestrator)
+│   ├── types.ts             # all type definitions
+│   ├── equipment-presets.ts # fixture preset definitions (6 types)
+│   ├── __tests__/           # vitest tests
 │   └── renderers/
-│       ├── grid-renderer.ts       # グリッド線描画
-│       ├── gridline-renderer.ts   # 通り芯描画（一点鎖線＋丸ラベル）
-│       ├── wall-renderer.ts       # 壁描画（開口部による分割処理含む）
-│       ├── opening-renderer.ts    # 窓・ドア描画（引違い窓・片開き・引き戸）
-│       ├── equipment-renderer.ts # 設備シンボル描画（6種）
-│       ├── label-renderer.ts      # 部屋ラベル描画
-│       ├── dimension-renderer.ts  # 寸法線描画
-│       ├── meta-renderer.ts       # コンパス・スケールバー描画
-│       └── area-table-renderer.ts # 面積表SVG描画
-├── samples/                 # サンプル間取りデータ
+│       ├── grid-renderer.ts       # grid line drawing
+│       ├── gridline-renderer.ts   # structural grid lines (dash-dot + round labels)
+│       ├── wall-renderer.ts       # wall drawing (including splitting around openings)
+│       ├── opening-renderer.ts    # window and door drawing
+│       ├── equipment-renderer.ts  # fixture symbol drawing (6 types)
+│       ├── label-renderer.ts      # room label drawing
+│       ├── dimension-renderer.ts  # dimension line drawing
+│       ├── meta-renderer.ts       # compass and scale bar drawing
+│       └── area-table-renderer.ts # area schedule SVG drawing
+├── samples/                 # sample floor plan data
 ├── package.json
 └── tsconfig.json
 ```
 
-## 主要な設計判断
+## Key design decisions
 
-### 壁の自動判定と明示定義
+### Automatic wall detection and explicit definition
 
-部屋の辺を全て収集し、同一線上の辺をグループ化する。辺が 1 部屋のみに属する場合は外壁（厚い）、2 部屋で共有されている場合は内壁（薄い）として自動判定する。
+All room edges are collected and edges lying on the same line are grouped. When an edge belongs to only one room it is judged an external wall (thick); when it is shared by two rooms it is judged an internal wall (thin).
 
-`geometry.walls.segments` で明示定義した壁は、`additive` モード（デフォルト）では自動抽出壁に追加され、`explicit_only` モードでは自動抽出を無効化して明示壁のみが使われる。
+Walls defined explicitly in `geometry.walls.segments` are added to the auto-extracted walls in `additive` mode (the default); in `explicit_only` mode auto-extraction is disabled and only explicit walls are used.
 
-明示壁には自動的に部屋の帰属（room ownership）が付与される。壁の線分が部屋の外周辺（perimeter edge）上にある場合、その部屋のIDが壁の `rooms` プロパティに追加される。multi-rect部屋の内部継ぎ目は外周に含まれないため、内部パーティション壁は `rooms: []` のまま維持される（内部壁の検出は `findBarriersInRoom` による幾何判定で行われる）。
+Explicit walls are automatically assigned room ownership. When a wall's line segment lies on a room's perimeter edge, that room's ID is added to the wall's `rooms` property. Internal seams of multi-rect rooms are not part of the perimeter, so internal partition walls keep `rooms: []` (detection of internal walls is handled geometrically by `findBarriersInRoom`).
 
-### 座標系
+### Coordinate systems
 
-- **YAML**: グリッド座標。原点は左下、Y軸は上向き（建築慣習）
-- **内部モデル**: mm 単位。グリッド座標 × モジュールサイズ (910mm) で変換
-- **SVG**: px 単位。`mmToSvg()` で Y 軸を反転（SVG は左上原点）
+- **YAML**: grid coordinates. Origin at bottom-left, Y axis pointing up (architectural convention)
+- **Internal model**: millimetres. Converted as grid coordinate × module size (910mm)
+- **SVG**: pixels. `mmToSvg()` flips the Y axis (SVG's origin is top-left)
 
-### 開口部と壁の分割
+### Openings and wall splitting
 
-壁に開口部がある場合、壁を開口部の両側に分割して描画する。開口部の範囲は壁の範囲内にクランプされ、重複する開口部も正しく処理される。
+When a wall contains an opening, the wall is drawn split on either side of the opening. The opening's extent is clamped to within the wall, and overlapping openings are handled correctly.
 
-## 技術スタック
+## Technology stack
 
 - **TypeScript** (ES2022 modules, strict mode)
-- **yaml** - YAML パーサ
-- **vitest** - テストフレームワーク (devDependency)
-- 外部ランタイム依存なし（Node.js 標準モジュールのみ）
+- **yaml** — YAML parser
+- **vitest** — test framework (devDependency)
+- No external runtime dependencies beyond the YAML parser (Node.js standard modules only)
 
 ## npm scripts
 
-| コマンド | 説明 |
+| Command | Description |
 |----------|------|
-| `npm run build` | TypeScript コンパイル (`dist/` に出力) |
-| `npm run render` | `dist/main.js` を実行 (デフォルト: `sample.yaml`) |
-| `npm run render:sample --name=<name>` | `samples/<name>.yaml` をレンダリング |
-| `npm run validate -- <file ...>` | 間取りデータのバリデーション |
-| `npm run validate -- --all` | 全サンプルを一括バリデーション |
-| `npm run dev` | TypeScript ウォッチモード |
-| `npm run watch -- <file.yaml>` | YAML を監視して保存ごとに自動レンダリング (ホットリロード) |
-| `npm test` | vitest でテスト実行 |
-| `npm run test:watch` | vitest ウォッチモード |
+| `npm run build` | TypeScript compilation (output to `dist/`) |
+| `npm run prepare` | Runs automatically after a git install; builds `dist/` |
+| `npm run render` | Runs `dist/main.js` (default: `sample.yaml`) |
+| `npm run render:sample --name=<name>` | Renders `samples/<name>.yaml` |
+| `npm run validate -- <file ...>` | Validates floor plan data |
+| `npm run validate -- --all` | Validates all samples at once |
+| `npm run dev` | TypeScript watch mode |
+| `npm run watch -- <file.yaml>` | Watches a YAML file and re-renders on every save (hot reload) |
+| `npm test` | Runs the tests with vitest |
+| `npm run test:watch` | vitest watch mode |
 
-### ホットリロード (watch モード)
+### Hot reload (watch mode)
 
-YAML を編集しながら間取りを試行錯誤するときに使う。`watch` サブコマンドで対象 YAML を監視し、保存のたびに SVG / HTML プレビュー / (任意) area.json を再生成する。
+Use this when iterating on a plan while editing YAML. The `watch` subcommand watches the target YAML and regenerates the SVG / HTML preview / (optionally) area.json on every save.
 
 ```bash
 npm run build
 npm run watch -- samples/3ldk-house.yaml
-# 別ターミナル or エディタで samples/3ldk-house.yaml を編集 → 保存
-# 同階層の samples/3ldk-house.html をブラウザで開いてリロードするとすぐ反映される
+# Edit samples/3ldk-house.yaml in another terminal or your editor → save
+# Open samples/3ldk-house.html in a browser and reload to see it update immediately
 ```
 
-出力 SVG の保存先や area.json も指定可能:
+The output SVG destination and area.json can also be specified:
 
 ```bash
 npm run watch -- samples/3ldk-house.yaml output/plan.svg --area-table
 ```
 
-YAML が壊れている間はエラーを表示して監視を継続する (プロセスは落ちない)。Ctrl+C で停止。
+While the YAML is broken it displays the error and keeps watching (the process does not exit). Stop with Ctrl+C.
 
-### サンプル一覧
+### Sample list
 
-`samples/` ディレクトリに用途別のサンプルを用意している。
+The `samples/` directory contains samples for various purposes.
 
 ```bash
-npm run render:sample --name=basic-3room       # 基本3部屋 (LDK+寝室+浴室)
-npm run render:sample --name=1r-studio        # 1R ワンルーム (最小構成)
-npm run render:sample --name=2ldk-apartment    # 2LDK マンション
-npm run render:sample --name=3ldk-house        # 3LDK 戸建 (東向き玄関)
-npm run render:sample --name=l-shaped-plan     # L字型間取り (北向き玄関)
-npm run render:sample --name=compact-2dk       # コンパクト2DK (西向き玄関)
-npm run render:sample --name=4ldk-complex      # 4LDK+sub_rooms (浴室/洗面分割、クローゼット分割)
-npm run render:sample --name=custom-walls-invalid      # 明示壁定義 (バリデーションエラーあり)
-npm run render:sample --name=4ldk-complex-invalid      # 4LDK (sub_rooms未定義、ISOLATED_SUBAREA検出)
-npm run render:sample --name=l-shaped-ldk              # L字型LDK (grid_rects multi-rect)
-npm run render:sample --name=u-shaped-courtyard        # コの字型中庭プラン
-npm run render:sample --name=twin-courtyard            # ツイン中庭プラン
-npm run render:sample --name=3ldk-with-equipment       # 3LDK+設備配置 (キッチン・UB・トイレ・洗面・洗濯機・冷蔵庫)
+npm run render:sample --name=basic-3room             # basic 3 rooms (LDK + bedroom + bathroom)
+npm run render:sample --name=1r-studio               # 1R studio (minimal configuration)
+npm run render:sample --name=2ldk-apartment          # 2LDK apartment
+npm run render:sample --name=3ldk-house              # 3LDK detached house (east-facing entrance)
+npm run render:sample --name=l-shaped-plan           # L-shaped plan (north-facing entrance)
+npm run render:sample --name=compact-2dk             # compact 2DK (west-facing entrance)
+npm run render:sample --name=4ldk-complex            # 4LDK + sub_rooms (bath/washroom split, closet split)
+npm run render:sample --name=custom-walls-invalid    # explicit wall definitions (contains validation errors)
+npm run render:sample --name=4ldk-complex-invalid    # 4LDK (sub_rooms undefined, ISOLATED_SUBAREA detected)
+npm run render:sample --name=l-shaped-ldk            # L-shaped LDK (grid_rects multi-rect)
+npm run render:sample --name=u-shaped-courtyard      # U-shaped courtyard plan
+npm run render:sample --name=twin-courtyard          # twin courtyard plan
+npm run render:sample --name=3ldk-with-equipment     # 3LDK + fixtures (kitchen, UB, WC, washbasin, washing machine, refrigerator)
 ```
 
-SVG と HTML プレビューが `samples/` 内に出力される。
+The SVG and HTML previews are written into `samples/`.
+
+## Licence
+
+MIT © 2026 4kk11. See [LICENSE](LICENSE). This fork retains the original licence and copyright.
