@@ -21,6 +21,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "prepare": "tsc",
     "render": "node dist/main.js",
     "render:sample": "node dist/main.js samples/$npm_config_name.yaml samples/$npm_config_name.svg",
     "dev": "tsc --watch",
