@@ -5,6 +5,12 @@ import { VALID_EQUIPMENT_TYPES } from './equipment-presets.js';
 export function parseArchilang(yamlText: string): Archilang {
   const data = parse(yamlText) as Archilang;
 
+  // parse() returns null for an empty or comment-only document; reading through
+  // it would surface as "Cannot read properties of null" rather than something
+  // an author can act on.
+  if (data == null || typeof data !== 'object') {
+    throw new Error('Empty or invalid YAML document');
+  }
   if (!data.archilang) {
     throw new Error('Missing archilang version');
   }

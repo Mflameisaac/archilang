@@ -102,3 +102,14 @@ describe('getFloorGrid', () => {
     expect(() => getFloorGrid(spec, '2F')).toThrow('No grid definition for floor');
   });
 });
+
+describe('empty documents', () => {
+  it('reports an actionable error for an empty document', () => {
+    expect(() => parseArchilang('')).toThrow('Empty or invalid YAML document');
+    expect(() => parseArchilang('   \n\n  ')).toThrow('Empty or invalid YAML document');
+  });
+
+  it('reports an actionable error for a comment-only document', () => {
+    expect(() => parseArchilang('# just a comment\n')).toThrow('Empty or invalid YAML document');
+  });
+});
