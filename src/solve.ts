@@ -39,7 +39,10 @@ export function runSolveLoop(yamlText: string, options: SolveOptions): SolveResu
 
     // Find auto-fixable issues
     const autoFixableIssues = result.issues.filter(issue =>
-      issue.code === 'GRID_MISALIGNMENT' || issue.code === 'ROOM_WITHOUT_DOOR'
+      issue.code === 'GRID_MISALIGNMENT' ||
+      issue.code === 'ROOM_WITHOUT_DOOR' ||
+      issue.code === 'SKIPPED_OPENING' ||
+      issue.code === 'UNREACHABLE_ROOM'
     );
 
     if (autoFixableIssues.length === 0) {
