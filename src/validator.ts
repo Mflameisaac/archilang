@@ -3,6 +3,7 @@ import {
   findBarriersInRoom, buildFloodFillContext, floodFill,
   summarizeRegion, findBoundaryBarrierIds,
 } from './flood-fill.js';
+import { isSwingStyle } from './opening-styles.js';
 
 const OUTSIDE = '__outside__' as const;
 const EPS = 0.5; // mm tolerance for coordinate comparisons
@@ -598,7 +599,7 @@ function detectDoorClearanceBlocked(
   if (equipment.length === 0) return;
 
   // Only swing doors (片開き) need clearance — sliding doors (引き戸) don't swing
-  const swingDoors = model.openings.filter(o => isDoor(o) && o.style === '片開き');
+  const swingDoors = model.openings.filter(o => isDoor(o) && isSwingStyle(o.style));
   if (swingDoors.length === 0) return;
 
   const wallMap = new Map(model.walls.map(w => [w.id, w]));

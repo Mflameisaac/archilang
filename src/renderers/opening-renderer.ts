@@ -1,16 +1,22 @@
 import { BuildingModel, ResolvedOpening } from '../types.js';
 import { SvgRenderConfig, mmToSvg, mmToSvgLength, svgGroup, escapeXml } from '../svg-utils.js';
+import { openingStyleKind } from '../opening-styles.js';
 
 export function renderOpenings(model: BuildingModel, config: SvgRenderConfig): string {
   const elements: string[] = [];
 
   for (const opening of model.openings) {
-    if (opening.style === '引違い窓') {
-      elements.push(renderSlidingWindow(opening, config));
-    } else if (opening.style === '片開き') {
-      elements.push(renderSwingDoor(opening, model, config));
-    } else if (opening.style === '引き戸') {
-      elements.push(renderSlidingDoor(opening, config));
+    switch (openingStyleKind(opening.style)) {
+      case 'sliding-window':
+        elements.push(renderSlidingWindow(opening, config));
+        break;
+      case 'swing':
+        elements.push(renderSwingDoor(opening, model, config));
+        break;
+      case 'sliding-door':
+        elements.push(renderSlidingDoor(opening, config));
+        break;
+      // 'fixed-window' has no renderer yet; 'unknown' draws nothing.
     }
   }
 
